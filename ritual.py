@@ -2,7 +2,6 @@ import pygame
 import sys
 import os
 import network
-import threading
 
 # Handle cli flags
 windowed = "--windowed" in sys.argv
@@ -32,11 +31,6 @@ else:
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN)
 display = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 clock = pygame.time.Clock()
-
-# Network
-server_ip = "127.0.0.1"
-server_port = 3535
-client = network.GameClient(server_ip, server_port)
 
 # Colors
 color_black = (0, 0, 0) 
@@ -70,6 +64,7 @@ def game():
                 running = False
 
         # Update
+        network.client_read_server()
 
         # Render
 
@@ -104,13 +99,9 @@ if __name__ == "__main__":
     frame_before_time = pygame.time.get_ticks()
     second_before_time = frame_before_time
     
-    # client_thread = threading.Thread(target=network.client_thread)
-    # client_thread.start()
-    client.start()
+    network.client_connect("127.0.0.1", 3535)
     next_gamestate = game()
 
     if next_gamestate == GAMESTATE_EXIT:
-        client.disconnect()
-        client.join()
-        # network.running = False
+        network.client_disconnect()
         pygame.quit()
