@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import network
+import gamestate
 
 # Handle cli flags
 windowed = "--windowed" in sys.argv
@@ -12,14 +13,12 @@ if "--debug" in sys.argv:
 
 # Resolution variables
 # Display stretches to Screen. Screen is set by user
-DISPLAY_WIDTH = 1280
-DISPLAY_HEIGHT = 720
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720
+DISPLAY_WIDTH = 640
+DISPLAY_HEIGHT = 360
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 360
 
 SCALE = SCREEN_WIDTH / DISPLAY_WIDTH
-
-# Timing variables
 
 # Init pygame
 os.environ['SDL_VIDEO_CENTERED'] = '1'
@@ -32,76 +31,211 @@ else:
 display = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 clock = pygame.time.Clock()
 
+# Timing variables
+before_time = 0
+UPDATE_TIME = 1000 / 60.0
+TARGET_FPS = 60
+
 # Colors
-color_black = (0, 0, 0) 
-color_yellow = (255, 255, 0) 
+color_black = (0, 0, 0)
+color_white = (255, 255, 255)
+color_red = (255, 0, 0)
+color_yellow = (255, 255, 0)
 
 # Fonts
 font_small = pygame.font.SysFont("Serif", 11)
 
-# Game states
-GAMESTATE_EXIT = 0
+# Gamestates
+GAMESTATE_EXIT = -1
+GAMESTATE_MENU = 0
+GAMESTATE_GAME = 1
+
+connect_as_server = False
 
 
-def game():
-
-    # Timing variables
-    TARGET_FPS = 60
-    SECOND = 1000
-    UPDATE_TIME = SECOND / 60.0
-    fps = 0
-    frames = 0
-    delta_time = 0
-    frame_before_time = 0
-    second_before_time = 0
+def menu():
+    global connect_as_server
 
     running = True
+    return_gamestate = GAMESTATE_EXIT
+
+    mouse_x, mouse_y = (0, 0)
+
+    button_rects = []
+    button_text_coords = []
+    button_texts = []
+    button_texts_offcolor = []
+    button_width = 50
+    button_height = 20
+    button_padding = 10
+    button_text_strings = ("Join", "Host")
+    for i in range(0, len(button_text_strings)):
+        button_x = (DISPLAY_WIDTH // 2) - (button_width // 2)
+        button_y = 100 + ((button_height + button_padding) * i)
+        button_rects.append((button_x, button_y, button_width, button_height))
+        button_texts.append(font_small.render(button_text_strings[i], False, color_white))
+        button_texts_offcolor.append(font_small.render(button_text_strings[i], False, color_black))
+        button_text_x = button_x + (button_width // 2) - (button_texts[i].get_width() // 2)
+        button_text_y = button_y + (button_height // 2) - (button_texts[i].get_height() // 2)
+        button_text_coords.append((button_text_x, button_text_y))
 
     while running:
         # Input
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 running = False
+            elif event.type == pygame.MOUSEMOTION:
+                mouse_x, mouse_y = event.pos[0] // SCALE, event.pos[1] // SCALE
+            elif event.type == pygame.MOUSEBUTTONUP:
+                for i in range(0, len(button_rects)):
+                    button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[i])
+                    if button_hovered:
+                        if i == 0:
+                            return_gamestate = GAMESTATE_GAME
+                            running = False
+                        elif i == 1:
+                            connect_as_server = True
+                            return_gamestate = GAMESTATE_GAME
+                            running = False
 
-        # Update
-        network.client_read_server()
+        display_clear()
 
-        # Render
-
-        # Clear display
-        pygame.draw.rect(display, color_black, (0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), False)
+        for i in range(0, len(button_rects)):
+            button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[i])
+            pygame.draw.rect(display, color_white, button_rects[i], not button_hovered)
+            if button_hovered:
+                display.blit(button_texts_offcolor[i], button_text_coords[i])
+            else:
+                display.blit(button_texts[i], button_text_coords[i])
 
         if show_fps:
-            text_fps = font_small.render("FPS: " + str(fps), False, color_yellow)
-            display.blit(text_fps, (0, 0))
+            render_fps()
 
-        # Flip display
-        pygame.transform.scale(display, (SCREEN_WIDTH, SCREEN_HEIGHT), screen)
-        pygame.display.flip()
-        frames += 1
-
-        # Timekeep
-        frame_after_time = pygame.time.get_ticks()
-        delta_time = (frame_after_time - frame_before_time) / UPDATE_TIME
-
-        if frame_after_time - second_before_time >= SECOND:
-            fps = frames
-            frames = 0
-            second_before_time += SECOND
-        frame_before_time = pygame.time.get_ticks()
+        display_flip()
 
         clock.tick(TARGET_FPS)
 
-    return GAMESTATE_EXIT
+    return return_gamestate
+
+
+def game():
+    global connect_as_server
+
+    running = True
+    return_gamestate = GAMESTATE_EXIT
+
+    local_player_index = 0
+
+    if connect_as_server:
+        network.server_begin(3535)
+    else:
+        network.client_connect("127.0.0.1", 3535)
+        while not network.client_connected:
+            data = network.client_read()
+            for command in data:
+                if command[0] == "ack":
+                    local_player_index = command[1]
+    gamestate.create_player()
+
+    before_time = pygame.time.get_ticks()
+
+    while running:
+        # Input
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                input_name = None
+                if event.key == pygame.K_w:
+                    input_name = gamestate.INPUT_UP
+                elif event.key == pygame.K_s:
+                    input_name = gamestate.INPUT_DOWN
+                elif event.key == pygame.K_d:
+                    input_name = gamestate.INPUT_RIGHT
+                elif event.key == pygame.K_a:
+                    input_name = gamestate.INPUT_LEFT
+                if input_name is not None:
+                    gamestate.player_input_queue_append(local_player_index, (True, input_name))
+                    if not connect_as_server:
+                        network.client_event_queue.append((True, input_name))
+            elif event.type == pygame.KEYUP:
+                input_name = None
+                if event.key == pygame.K_w:
+                    input_name = gamestate.INPUT_UP
+                elif event.key == pygame.K_s:
+                    input_name = gamestate.INPUT_DOWN
+                elif event.key == pygame.K_d:
+                    input_name = gamestate.INPUT_RIGHT
+                elif event.key == pygame.K_a:
+                    input_name = gamestate.INPUT_LEFT
+                if input_name is not None:
+                    gamestate.player_input_queue_append(local_player_index, (False, input_name))
+                    if not connect_as_server:
+                        network.client_event_queue.append((False, input_name))
+
+        # Read network
+        if connect_as_server:
+            network.server_read()
+            while len(network.server_event_queue) != 0:
+                server_event = network.server_event_queue.pop(0)
+                if server_event[0] == network.SERVER_EVENT_NEW_PLAYER:
+                    gamestate.create_player()
+                elif server_event[0] == network.SERVER_EVENT_PLAYER_INPUT:
+                    gamestate.player_input_queue_append(server_event[1], server_event[2])
+        else:
+            server_data = network.client_read()
+            for command in server_data:
+                gamestate.state_data_set(command)
+
+        # Update gamestate
+        delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
+        before_time = pygame.time.get_ticks()
+        gamestate.update(delta)
+
+        # Write network
+        if connect_as_server:
+            network.server_write(gamestate.state_data_get())
+        else:
+            network.client_write()
+
+        display_clear()
+
+        for player_index in range(0, gamestate.player_count_get()):
+            pygame.draw.rect(display, color_red, gamestate.player_rect_get(player_index), False)
+
+        if show_fps:
+            render_fps()
+
+        display_flip()
+
+        clock.tick(TARGET_FPS)
+
+    return return_gamestate
+
+
+def point_in_rect(point, rect):
+    return point[0] >= rect[0] and point[0] <= rect[0] + rect[2] and point[1] >= rect[1] and point[1] <= rect[1] + rect[3]
+
+
+def display_clear():
+    pygame.draw.rect(display, color_black, (0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), False)
+
+
+def display_flip():
+    pygame.transform.scale(display, (SCREEN_WIDTH, SCREEN_HEIGHT), screen)
+    pygame.display.flip()
+
+
+def render_fps():
+    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())), False, color_yellow)
+    display.blit(text_fps, (0, 0))
 
 
 if __name__ == "__main__":
-    frame_before_time = pygame.time.get_ticks()
-    second_before_time = frame_before_time
-    
-    network.client_connect("127.0.0.1", 3535)
-    next_gamestate = game()
-
-    if next_gamestate == GAMESTATE_EXIT:
-        network.client_disconnect()
-        pygame.quit()
+    current_gamestate = GAMESTATE_MENU
+    while current_gamestate != GAMESTATE_EXIT:
+        if current_gamestate == GAMESTATE_MENU:
+            current_gamestate = menu()
+        elif current_gamestate == GAMESTATE_GAME:
+            current_gamestate = game()
+    pygame.quit()
