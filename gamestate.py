@@ -1,4 +1,5 @@
 import math
+import animations
 
 # Input Names
 INPUT_UP = 0
@@ -14,6 +15,12 @@ player_input_direction = []
 
 screen_dimensions = []
 screen_center = []
+
+player_animation_idle = []
+player_animation_run = []
+player_animation_walk = []
+player_animation_state = []
+player_animation_flipped = []
 
 PLAYER_WIDTH = 32
 PLAYER_HEIGHT = 31
@@ -35,6 +42,11 @@ def create_player():
     player_input_queue.append([])
     player_input_state.append([False, False, False, False])
     player_input_direction.append([0, 0])
+
+    player_animation_idle.append(animations.instance_create(animations.ANIMATION_PLAYER_IDLE))
+    player_animation_run.append(animations.instance_create(animations.ANIMATION_PLAYER_RUN))
+    player_animation_state.append(0)
+    player_animation_flipped.append(False)
 
     player_position.append([100, 100])
     player_velocity.append([0, 0])
@@ -110,6 +122,26 @@ def update(delta):
         player_position[player_index][0] += player_velocity[player_index][0] * delta
         player_position[player_index][1] += player_velocity[player_index][1] * delta
 
+        # Update player animations
+        if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
+            player_animation_flipped[player_index] = False
+        elif not player_animation_flipped[player_index] and player_velocity[player_index][0] < 0:
+            player_animation_flipped[player_index] = True
+        if player_animation_state[player_index] == 0:
+            if player_velocity[player_index][0] == 0 and player_velocity[player_index][1] == 0:
+                animations.instance_update(player_animation_idle[player_index], delta)
+            else:
+                animations.instance_reset(player_animation_idle[player_index])
+                player_animation_state[player_index] = 1
+                animations.instance_update(player_animation_run[player_index], delta)
+        elif player_animation_state[player_index] == 1:
+            if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
+                animations.instance_update(player_animation_run[player_index], delta)
+            else:
+                animations.instance_reset(player_animation_run[player_index])
+                player_animation_state[player_index] = 0
+                animations.instance_update(player_animation_idle[player_index], delta)
+
 
 def player_camera_position_set(player_index):
     global player_position, player_input_mouse_position, player_input_mouse_sensitivity, player_camera_offset, screen_center
@@ -153,6 +185,17 @@ def player_rect_get(player_index):
 
 def player_rect_offset_get(player_index):
     return [int(player_position[player_index][0] - player_camera_offset[0]), int(player_position[player_index][1] - player_camera_offset[1]), PLAYER_WIDTH, PLAYER_HEIGHT]
+
+
+def player_animation_frame_get(player_index):
+    global player_animation_state, player_animation_flipped, player_animation_idle, player_animation_run, player_animation_walk
+
+    if player_animation_state[player_index] == 0:
+        return animations.instance_frame_get(player_animation_idle[player_index], player_animation_flipped[player_index])
+    elif player_animation_state[player_index] == 1:
+        return animations.instance_frame_get(player_animation_run[player_index], player_animation_flipped[player_index])
+
+    return []
 
 
 def scale_vector(old_vector, new_magnitude):

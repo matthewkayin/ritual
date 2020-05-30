@@ -3,6 +3,7 @@ import sys
 import os
 import network
 import gamestate
+import animations
 
 # Handle cli flags
 windowed = "--windowed" in sys.argv
@@ -13,10 +14,10 @@ if "--debug" in sys.argv:
 
 # Resolution variables
 # Display stretches to Screen. Screen is set by user
-DISPLAY_WIDTH = 960
-DISPLAY_HEIGHT = 540
-SCREEN_WIDTH = 960
-SCREEN_HEIGHT = 540
+DISPLAY_WIDTH = 640
+DISPLAY_HEIGHT = 360
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 360
 
 SCALE = SCREEN_WIDTH / DISPLAY_WIDTH
 
@@ -136,6 +137,7 @@ def game():
                 if command[0] == "ack":
                     local_player_index = command[1]
 
+    animations.load_all()
     gamestate.screen_dimensions_set((SCREEN_WIDTH, SCREEN_HEIGHT))
     gamestate.create_player()
 
@@ -206,7 +208,10 @@ def game():
         display_clear()
 
         for player_index in range(0, gamestate.player_count_get()):
-            pygame.draw.rect(display, color_red, gamestate.player_rect_offset_get(player_index), False)
+            player_coords = gamestate.player_rect_offset_get(player_index)
+            player_animation_data = gamestate.player_animation_frame_get(player_index)
+            display.blit(animations.image_get_from_frame(player_animation_data), player_coords)
+            # pygame.draw.rect(display, color_red, gamestate.player_rect_offset_get(player_index), False)
 
         if show_fps:
             render_fps()
@@ -223,7 +228,7 @@ def point_in_rect(point, rect):
 
 
 def display_clear():
-    pygame.draw.rect(display, color_black, (0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), False)
+    pygame.draw.rect(display, color_red, (0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), False)
 
 
 def display_flip():
