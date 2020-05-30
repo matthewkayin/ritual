@@ -13,10 +13,10 @@ if "--debug" in sys.argv:
 
 # Resolution variables
 # Display stretches to Screen. Screen is set by user
-DISPLAY_WIDTH = 640
-DISPLAY_HEIGHT = 360
-SCREEN_WIDTH = 640
-SCREEN_HEIGHT = 360
+DISPLAY_WIDTH = 960
+DISPLAY_HEIGHT = 540
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 540
 
 SCALE = SCREEN_WIDTH / DISPLAY_WIDTH
 
@@ -135,6 +135,8 @@ def game():
             for command in data:
                 if command[0] == "ack":
                     local_player_index = command[1]
+
+    gamestate.screen_dimensions_set((SCREEN_WIDTH, SCREEN_HEIGHT))
     gamestate.create_player()
 
     before_time = pygame.time.get_ticks()
@@ -172,6 +174,8 @@ def game():
                     gamestate.player_input_queue_append(local_player_index, (False, input_name))
                     if not connect_as_server:
                         network.client_event_queue.append((False, input_name))
+            elif event.type == pygame.MOUSEMOTION:
+                gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
 
         # Read network
         if connect_as_server:
@@ -191,6 +195,7 @@ def game():
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
         before_time = pygame.time.get_ticks()
         gamestate.update(delta)
+        gamestate.player_camera_position_set(local_player_index)
 
         # Write network
         if connect_as_server:
@@ -201,7 +206,7 @@ def game():
         display_clear()
 
         for player_index in range(0, gamestate.player_count_get()):
-            pygame.draw.rect(display, color_red, gamestate.player_rect_get(player_index), False)
+            pygame.draw.rect(display, color_red, gamestate.player_rect_offset_get(player_index), False)
 
         if show_fps:
             render_fps()

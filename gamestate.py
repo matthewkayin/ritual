@@ -6,16 +6,29 @@ INPUT_DOWN = 1
 INPUT_RIGHT = 2
 INPUT_LEFT = 3
 
+player_input_mouse_position = [0, 0]
+player_input_mouse_sensitivity = 0.15
 player_input_queue = []
 player_input_state = []
 player_input_direction = []
 
-PLAYER_WIDTH = 20
-PLAYER_HEIGHT = 40
+screen_dimensions = []
+screen_center = []
+
+PLAYER_WIDTH = 32
+PLAYER_HEIGHT = 31
 PLAYER_SPEED = 3
 
+player_camera_offset = [0, 0]
 player_position = []
 player_velocity = []
+
+
+def screen_dimensions_set(screen_size):
+    global screen_dimensions, screen_center
+
+    screen_dimensions = screen_size
+    screen_center = (screen_dimensions[0] // 2, screen_dimensions[1] // 2)
 
 
 def create_player():
@@ -80,6 +93,12 @@ def player_input_handle(player_index, input_event):
         player_velocity[player_index] = scale_vector(player_input_direction[player_index], PLAYER_SPEED)
 
 
+def player_input_mouse_position_set(new_mouse_x, new_mouse_y):
+    global player_input_mouse_position
+
+    player_input_mouse_position = [new_mouse_x, new_mouse_y]
+
+
 def update(delta):
     for player_index in range(0, player_count_get()):
         # Handle input queue
@@ -90,6 +109,13 @@ def update(delta):
         # Update player position
         player_position[player_index][0] += player_velocity[player_index][0] * delta
         player_position[player_index][1] += player_velocity[player_index][1] * delta
+
+
+def player_camera_position_set(player_index):
+    global player_position, player_input_mouse_position, player_input_mouse_sensitivity, player_camera_offset, screen_center
+
+    mouse_offset = [(player_input_mouse_position[0] - screen_center[0]) * player_input_mouse_sensitivity, (player_input_mouse_position[1] - screen_center[1]) * player_input_mouse_sensitivity]
+    player_camera_offset = [player_position[player_index][0] - screen_center[0] + mouse_offset[0], player_position[player_index][1] - screen_center[1] + mouse_offset[1]]
 
 
 def state_data_get():
@@ -123,6 +149,10 @@ def player_count_get():
 
 def player_rect_get(player_index):
     return [int(player_position[player_index][0]), int(player_position[player_index][1]), PLAYER_WIDTH, PLAYER_HEIGHT]
+
+
+def player_rect_offset_get(player_index):
+    return [int(player_position[player_index][0] - player_camera_offset[0]), int(player_position[player_index][1] - player_camera_offset[1]), PLAYER_WIDTH, PLAYER_HEIGHT]
 
 
 def scale_vector(old_vector, new_magnitude):
