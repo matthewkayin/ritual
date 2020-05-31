@@ -13,11 +13,17 @@ animation_frame_duration = []
 
 animation_paths = ["idlewizard", "runwizard", "walkwizard"]
 
+image_map = None
+
 
 def load_all():
+    global image_map
+
     load_from_file(ANIMATION_PLAYER_IDLE, (20, 32), 14, 1.5, True)
     load_from_file(ANIMATION_PLAYER_RUN, (31, 32), 4, 0.4, True)
     load_from_file(ANIMATION_PLAYER_WALK, (24, 32), 5, 1.2, True)
+
+    image_map = pygame.image.load(image_path + "testmap.png").convert()
 
 
 def load_from_file(animation_name, frame_size, frame_count, duration, has_alpha):

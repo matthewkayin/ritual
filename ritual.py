@@ -139,6 +139,7 @@ def game():
 
     animations.load_all()
     gamestate.screen_dimensions_set((SCREEN_WIDTH, SCREEN_HEIGHT))
+    gamestate.map_load()
     gamestate.create_player()
 
     before_time = pygame.time.get_ticks()
@@ -207,11 +208,19 @@ def game():
 
         display_clear()
 
+        display.blit(animations.image_map, (0 - gamestate.player_camera_offset[0], 0 - gamestate.player_camera_offset[1]))
+
+        for collider in gamestate.map_colliders:
+            pygame.draw.rect(display, color_yellow, (collider[0] - gamestate.player_camera_offset[0], collider[1] - gamestate.player_camera_offset[1], collider[2], collider[3]), False)
+
         for player_index in range(0, gamestate.player_count_get()):
-            player_coords = gamestate.player_rect_offset_get(player_index)
+            player_coords = gamestate.player_render_coordinates_get(player_index)
             player_animation_data = gamestate.player_animation_frame_get(player_index)
             display.blit(animations.image_get_from_frame(player_animation_data), player_coords)
-            # pygame.draw.rect(display, color_red, gamestate.player_rect_offset_get(player_index), False)
+            player_rect_raw = gamestate.player_rect_get(player_index)
+            player_rect_raw[0] -= gamestate.player_camera_offset[0]
+            player_rect_raw[1] -= gamestate.player_camera_offset[1]
+            pygame.draw.rect(display, color_red, player_rect_raw, 1)
 
         if show_fps:
             render_fps()

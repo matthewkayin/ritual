@@ -22,13 +22,17 @@ player_animation_walk = []
 player_animation_state = []
 player_animation_flipped = []
 
-PLAYER_WIDTH = 32
-PLAYER_HEIGHT = 31
+player_size_idle = [4, 6, 15, 26]
+player_size_run = [-10, 1, 20, 32]
+player_size_walk = [1, 1, 24, 32]
 PLAYER_SPEED = 3
 
 player_camera_offset = [0, 0]
 player_position = []
 player_velocity = []
+
+map_colliders = []
+map_triangle_colliders = []
 
 
 def screen_dimensions_set(screen_size):
@@ -36,6 +40,23 @@ def screen_dimensions_set(screen_size):
 
     screen_dimensions = screen_size
     screen_center = (screen_dimensions[0] // 2, screen_dimensions[1] // 2)
+
+
+def map_load():
+    global map_colliders
+
+    # Walls
+    map_colliders.append((0, 0, 1280, 64))
+    map_colliders.append((0, 64, 64, 592))
+    map_colliders.append((0, 656, 1280, 64))
+    map_colliders.append((1216, 64, 64, 592))
+
+    # Bookshelves
+    map_colliders.append((128, 128, 400, 70))
+    map_colliders.append((128, 262, 400, 70))
+
+    # Triangle
+    map_triangle_colliders.append((780, 1126, 321, 121))
 
 
 def create_player():
@@ -48,7 +69,7 @@ def create_player():
     player_animation_state.append(0)
     player_animation_flipped.append(False)
 
-    player_position.append([100, 100])
+    player_position.append([128, 400])
     player_velocity.append([0, 0])
 
 
@@ -122,6 +143,28 @@ def update(delta):
         player_position[player_index][0] += player_velocity[player_index][0] * delta
         player_position[player_index][1] += player_velocity[player_index][1] * delta
 
+        # Check player map collisions
+        player_rect = player_rect_get(player_index)
+        for collider in map_colliders:
+            if collision_check_rectangles(player_rect, collider):
+                player_x_step = player_velocity[player_index][0] * delta
+                player_y_step = player_velocity[player_index][1] * delta
+
+                player_rect[1] -= player_y_step
+                collision_caused_by_x = collision_check_rectangles(player_rect, collider)
+                player_rect[1] += player_y_step
+
+                player_rect[0] -= player_x_step
+                collision_caused_by_y = collision_check_rectangles(player_rect, collider)
+                player_rect[0] += player_x_step
+
+                if collision_caused_by_x:
+                    player_position[player_index][0] -= player_x_step
+                    player_rect[0] -= player_x_step
+                if collision_caused_by_y:
+                    player_position[player_index][1] -= player_y_step
+                    player_rect[1] -= player_x_step
+
         # Update player animations
         if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
             player_animation_flipped[player_index] = False
@@ -180,11 +223,23 @@ def player_count_get():
 
 
 def player_rect_get(player_index):
-    return [int(player_position[player_index][0]), int(player_position[player_index][1]), PLAYER_WIDTH, PLAYER_HEIGHT]
+    return [int(player_position[player_index][0]), int(player_position[player_index][1]), 15, 26]
 
 
-def player_rect_offset_get(player_index):
-    return [int(player_position[player_index][0] - player_camera_offset[0]), int(player_position[player_index][1] - player_camera_offset[1]), PLAYER_WIDTH, PLAYER_HEIGHT]
+def player_render_coordinates_get(player_index):
+    player_rect = player_rect_get(player_index)
+    player_rect[0] -= 4
+    player_rect[1] -= 6
+
+    if player_animation_state[player_index] == 1 and not player_animation_flipped[player_index]:
+        player_rect[0] -= 8
+    elif player_animation_state[player_index] == 0 and player_animation_flipped[player_index]:
+        player_rect[0] += 3
+
+    player_rect[0] -= player_camera_offset[0]
+    player_rect[1] -= player_camera_offset[1]
+
+    return [int(player_rect[0]), int(player_rect[1])]
 
 
 def player_animation_frame_get(player_index):
@@ -204,3 +259,7 @@ def scale_vector(old_vector, new_magnitude):
     if scale == 0:
         return [0, 0]
     return [old_vector[0] * scale, old_vector[1] * scale]
+
+
+def collision_check_rectangles(rect_first, rect_second):
+    return not (rect_first[0] + rect_first[2] <= rect_second[0] or rect_second[0] + rect_second[2] <= rect_first[0] or rect_first[1] + rect_first[3] <= rect_second[1] or rect_second[1] + rect_second[3] <= rect_first[1])
