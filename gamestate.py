@@ -144,8 +144,15 @@ def update(delta):
         player_position[player_index][1] += player_velocity[player_index][1] * delta
 
         # Check player map collisions
-        player_rect = player_rect_get(player_index)
+        stop_colliders = []
         for collider in map_colliders:
+            stop_colliders.append(collider)
+        for other_player_index in range(0, player_count_get()):
+            if other_player_index != player_index:
+                stop_colliders.append(player_rect_get(other_player_index))
+
+        player_rect = player_rect_get(player_index)
+        for collider in stop_colliders:
             if collision_check_rectangles(player_rect, collider):
                 player_x_step = player_velocity[player_index][0] * delta
                 player_y_step = player_velocity[player_index][1] * delta
@@ -254,10 +261,10 @@ def player_animation_frame_get(player_index):
 
 
 def scale_vector(old_vector, new_magnitude):
-    old_magnitude = math.sqrt((2 ** old_vector[0]) + (2 ** old_vector[1]))
-    scale = new_magnitude / old_magnitude
-    if scale == 0:
+    old_magnitude = math.sqrt((old_vector[0] ** 2) + (old_vector[1] ** 2))
+    if old_magnitude == 0:
         return [0, 0]
+    scale = new_magnitude / old_magnitude
     return [old_vector[0] * scale, old_vector[1] * scale]
 
 
