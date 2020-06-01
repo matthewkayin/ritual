@@ -34,6 +34,9 @@ player_position = []
 player_velocity = []
 
 player_pending_spells = []
+player_equipped_spells = []
+player_selected_spell = []
+player_spell_cooldown_timers = []
 spell_instances = []
 
 map_colliders = []
@@ -74,6 +77,9 @@ def create_player():
     player_velocity.append([0, 0])
 
     player_pending_spells.append(None)
+    player_equipped_spells.append([0, -1, -1, -1])
+    player_selected_spell.append(0)
+    player_spell_cooldown_timers.append([-1, -1, -1, -1])
 
 
 def player_input_queue_append(player_index, input_event):
@@ -101,10 +107,12 @@ def player_input_handle(player_index, input_event):
             player_input_direction[player_index][0] = -1
             update_player_velocity = True
         elif input_event_name == INPUT_SPELLCAST:
-            new_spell_instance = spells.instance_create(spells.SPELL_MAGIC_MISSILE)
-            player_pending_spells[player_index] = new_spell_instance
-            if spells.instance_can_instant_cast(new_spell_instance):
-                player_spell_cast(player_index, mouse_pos)
+            spell_name = player_equipped_spells[player_index][player_selected_spell[player_index]]
+            if player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] == -1:
+                new_spell_instance = spells.instance_create(spell_name)
+                player_pending_spells[player_index] = new_spell_instance
+                if spells.instance_can_instant_cast(new_spell_instance):
+                    player_spell_cast(player_index, mouse_pos)
         player_input_state[player_index][input_event_name] = True
     else:
         if input_event_name == INPUT_UP:
@@ -164,6 +172,7 @@ def player_spell_cast(player_index, mouse_pos):
             return
     spell_instances.append(spell_instance)
     player_pending_spells[player_index] = None
+    player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] = 0
 
 
 def player_input_mouse_position_set(new_mouse_x, new_mouse_y):
@@ -219,6 +228,14 @@ def update(delta):
         # Update player pending spell
         if player_pending_spells[player_index] is not None:
             spells.instance_update(player_pending_spells[player_index], delta, False)
+
+        # Update spell cooldown timers
+        for i in range(0, 4):
+            if player_spell_cooldown_timers[player_index][i] != -1:
+                player_spell_cooldown_timers[player_index][i] += delta
+                spell_name = player_equipped_spells[player_index][player_selected_spell[player_index]]
+                if player_spell_cooldown_timers[player_index][i] >= spells.spell_cooldown_time[spell_name]:
+                    player_spell_cooldown_timers[player_index][i] = -1
 
         # Update player animations
         if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
