@@ -13,6 +13,8 @@ spell_size = []
 spell_speed = []
 spell_damage = []
 
+spell_magic_missile_extra_speed = 3
+
 
 def spell_define(name, charge_type, charge_time, cooldown_time, time_to_live, size, speed, damage):
     spell_charge_type.append(charge_type)
@@ -25,7 +27,7 @@ def spell_define(name, charge_type, charge_time, cooldown_time, time_to_live, si
 
 
 def spell_define_all():
-    spell_define(SPELL_MAGIC_MISSILE, CHARGE_INSTANT, 0, 3.0, 3.0, (10, 10), 5, 60)
+    spell_define(SPELL_MAGIC_MISSILE, CHARGE_PARTIAL_CAST, 1.0, 3.0, 3.0, (10, 10), 5, 60)
 
 
 def spell_charge_type_get(spell_name):
@@ -44,6 +46,10 @@ def instance_create(spell_name):
 def instance_values_set(spell_instance, values):
     for i in range(0, len(values)):
         spell_instance[1 + i] = values[i]
+
+
+def instance_timer_percentage_get(spell_instance):
+    return min(1, spell_instance[1] / spell_charge_time[spell_instance[0]])
 
 
 def instance_timer_set(spell_instance, value):
@@ -68,9 +74,24 @@ def instance_cast(spell_instance, origin, aim_vector):
     spell_instance[5] = aim_vector[1]
 
 
+def instance_speed_on_cast_get(spell_instance):
+    base_speed = spell_speed_get(spell_instance[0])
+    if spell_instance[0] == SPELL_MAGIC_MISSILE:
+        return base_speed + (spell_magic_missile_extra_speed * instance_timer_percentage_get(spell_instance))
+    else:
+        return base_speed
+
+
 def instance_cast_ready(spell_instance):
     instance_name = spell_instance[0]
-    return (spell_charge_type[instance_name] == CHARGE_REQUIRES_FULL and spell_instance[1] >= spell_charge_time[instance_name]) or True
+    if spell_charge_type[instance_name] == CHARGE_REQUIRES_FULL:
+        return spell_instance[1] >= spell_charge_time[instance_name]
+    else:
+        return True
+
+
+def instance_can_instant_cast(spell_instance):
+    return spell_charge_type[spell_instance[0]] == CHARGE_INSTANT
 
 
 def instance_cast_cancel(spell_instance):

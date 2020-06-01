@@ -103,7 +103,7 @@ def player_input_handle(player_index, input_event):
         elif input_event_name == INPUT_SPELLCAST:
             new_spell_instance = spells.instance_create(spells.SPELL_MAGIC_MISSILE)
             player_pending_spells[player_index] = new_spell_instance
-            if spells.instance_cast_ready(new_spell_instance):
+            if spells.instance_can_instant_cast(new_spell_instance):
                 player_spell_cast(player_index, mouse_pos)
         player_input_state[player_index][input_event_name] = True
     else:
@@ -154,7 +154,7 @@ def player_spell_cast(player_index, mouse_pos):
     spell_origin = scale_vector(aim_vector, spell_distance_from_player)
     spell_origin[0] += player_center[0]
     spell_origin[1] += player_center[1]
-    instance_aim_vector = scale_vector(aim_vector, spells.spell_speed_get(spell_instance[0]))
+    instance_aim_vector = scale_vector(aim_vector, spells.instance_speed_on_cast_get(spell_instance))
 
     spells.instance_cast(spell_instance, spell_origin, instance_aim_vector)
     spell_rect = spells.instance_rect_get(spell_instance)
@@ -383,6 +383,13 @@ def player_render_coordinates_get(player_index):
     player_rect[1] -= player_camera_offset[1]
 
     return [int(player_rect[0]), int(player_rect[1])]
+
+
+def player_spell_charge_percentage_get(player_index):
+    if player_pending_spells[player_index] is None:
+        return 0
+    else:
+        return spells.instance_timer_percentage_get(player_pending_spells[player_index])
 
 
 def player_spell_render_coordinates_get(spell_index):
