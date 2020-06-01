@@ -1,11 +1,13 @@
 import math
 import animations
+import spells
 
 # Input Names
 INPUT_UP = 0
 INPUT_DOWN = 1
 INPUT_RIGHT = 2
 INPUT_LEFT = 3
+INPUT_SPELLCAST = 4
 
 player_input_mouse_position = [0, 0]
 player_input_mouse_sensitivity = 0.15
@@ -31,8 +33,10 @@ player_camera_offset = [0, 0]
 player_position = []
 player_velocity = []
 
+player_pending_spells = []
+spell_instances = []
+
 map_colliders = []
-map_triangle_colliders = []
 
 
 def screen_dimensions_set(screen_size):
@@ -55,13 +59,10 @@ def map_load():
     map_colliders.append((128, 128, 400, 70))
     map_colliders.append((128, 262, 400, 70))
 
-    # Triangle
-    map_triangle_colliders.append((780, 1126, 321, 121))
-
 
 def create_player():
     player_input_queue.append([])
-    player_input_state.append([False, False, False, False])
+    player_input_state.append([False, False, False, False, False])
     player_input_direction.append([0, 0])
 
     player_animation_idle.append(animations.instance_create(animations.ANIMATION_PLAYER_IDLE))
@@ -72,6 +73,8 @@ def create_player():
     player_position.append([128, 400])
     player_velocity.append([0, 0])
 
+    player_pending_spells.append(None)
+
 
 def player_input_queue_append(player_index, input_event):
     player_input_queue[player_index].append(input_event)
@@ -80,6 +83,9 @@ def player_input_queue_append(player_index, input_event):
 def player_input_handle(player_index, input_event):
     event_is_keydown = input_event[0]
     input_event_name = input_event[1]
+    mouse_pos = None
+    if len(input_event) > 2:
+        mouse_pos = input_event[2]
     update_player_velocity = False
     if event_is_keydown:
         if input_event_name == INPUT_UP:
@@ -94,6 +100,11 @@ def player_input_handle(player_index, input_event):
         elif input_event_name == INPUT_LEFT:
             player_input_direction[player_index][0] = -1
             update_player_velocity = True
+        elif input_event_name == INPUT_SPELLCAST:
+            new_spell_instance = spells.instance_create(spells.SPELL_MAGIC_MISSILE)
+            player_pending_spells[player_index] = new_spell_instance
+            if spells.instance_cast_ready(new_spell_instance):
+                player_spell_cast(player_index, mouse_pos)
         player_input_state[player_index][input_event_name] = True
     else:
         if input_event_name == INPUT_UP:
@@ -120,16 +131,44 @@ def player_input_handle(player_index, input_event):
             else:
                 player_input_direction[player_index][0] = 0
             update_player_velocity = True
+        elif input_event_name == INPUT_SPELLCAST:
+            if player_pending_spells[player_index] is not None:
+                if spells.instance_cast_ready(player_pending_spells[player_index]):
+                    player_spell_cast(player_index, mouse_pos)
+                else:
+                    player_pending_spells[player_index] = None
         player_input_state[player_index][input_event_name] = False
 
     if update_player_velocity:
         player_velocity[player_index] = scale_vector(player_input_direction[player_index], PLAYER_SPEED)
 
 
+def player_spell_cast(player_index, mouse_pos):
+    spell_instance = player_pending_spells[player_index]
+    player_rect = player_rect_get(player_index)
+    player_center = (player_rect[0] + (player_rect[2] // 2), player_rect[1] + (player_rect[3] // 2))
+
+    spell_distance_from_player = player_rect[3]
+    aim_vector = [mouse_pos[0] - player_center[0], mouse_pos[1] - player_center[1]]
+
+    spell_origin = scale_vector(aim_vector, spell_distance_from_player)
+    spell_origin[0] += player_center[0]
+    spell_origin[1] += player_center[1]
+    instance_aim_vector = scale_vector(aim_vector, spells.spell_speed_get(spell_instance[0]))
+
+    spells.instance_cast(spell_instance, spell_origin, instance_aim_vector)
+    spell_instances.append(spell_instance)
+    player_pending_spells[player_index] = None
+
+
 def player_input_mouse_position_set(new_mouse_x, new_mouse_y):
     global player_input_mouse_position
 
     player_input_mouse_position = [new_mouse_x, new_mouse_y]
+
+
+def player_input_offset_mouse_position_get(mouse_x, mouse_y):
+    return [int(mouse_x + player_camera_offset[0]), int(mouse_y + player_camera_offset[1])]
 
 
 def update(delta):
@@ -172,6 +211,10 @@ def update(delta):
                     player_position[player_index][1] -= player_y_step
                     player_rect[1] -= player_x_step
 
+        # Update player pending spell
+        if player_pending_spells[player_index] is not None:
+            spells.instance_update(player_pending_spells[player_index], delta, False)
+
         # Update player animations
         if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
             player_animation_flipped[player_index] = False
@@ -192,6 +235,15 @@ def update(delta):
                 player_animation_state[player_index] = 0
                 animations.instance_update(player_animation_idle[player_index], delta)
 
+    # Update spells
+    spell_indexes_deleted_this_frame = []
+    for spell_index in range(0, len(spell_instances)):
+        spells.instance_update(spell_instances[spell_index], delta)
+        if spell_instances[spell_index][0] == spells.SPELL_DELETE_ME:
+            spell_indexes_deleted_this_frame.append(spell_index)
+    for index in spell_indexes_deleted_this_frame:
+        del spell_instances[index]
+
 
 def player_camera_position_set(player_index):
     global player_position, player_input_mouse_position, player_input_mouse_sensitivity, player_camera_offset, screen_center
@@ -202,31 +254,93 @@ def player_camera_position_set(player_index):
 
 def state_data_get():
     state_data = []
+
+    player_data = []
     for player_index in range(0, player_count_get()):
-        state_data_entry = []
+        player_data_entry = []
 
-        state_data_entry.append(int(player_position[player_index][0]))
-        state_data_entry.append(int(player_position[player_index][1]))
-        state_data_entry.append(round(player_velocity[player_index][0], 2))
-        state_data_entry.append(round(player_velocity[player_index][1], 2))
+        player_data_entry.append(int(player_position[player_index][0]))
+        player_data_entry.append(int(player_position[player_index][1]))
+        player_data_entry.append(round(player_velocity[player_index][0], 2))
+        player_data_entry.append(round(player_velocity[player_index][1], 2))
 
-        state_data.append(state_data_entry)
+        player_data.append(player_data_entry)
+    state_data.append(player_data)
+
+    spell_data = []
+    for player_index in range(0, player_count_get()):
+        if player_pending_spells[player_index] is not None:
+            spell_data_entry = []
+
+            spell_data_entry.append(int(player_index))
+            spell_data_entry.append(int(player_pending_spells[player_index][0]))
+            spell_data_entry.append(int(player_pending_spells[player_index][1]))
+
+            spell_data.append(spell_data_entry)
+    for spell_index in range(0, spell_count_get()):
+        spell_data_entry = []
+
+        spell_data_entry.append(int(spell_instances[spell_index][0]))
+        spell_data_entry.append(int(spell_instances[spell_index][1]))
+        spell_data_entry.append(int(spell_instances[spell_index][2]))
+        spell_data_entry.append(int(spell_instances[spell_index][3]))
+        spell_data_entry.append(round(spell_instances[spell_index][4], 2))
+        spell_data_entry.append(round(spell_instances[spell_index][5], 2))
+
+        spell_data.append(spell_data_entry)
+    state_data.append(spell_data)
 
     return state_data
 
 
 def state_data_set(state_data):
+    global spell_instances
+
+    player_data = state_data[0]
     for player_index in range(0, len(state_data)):
         if player_index == player_count_get():
             create_player()
-        player_position[player_index][0] = int(state_data[player_index][0])
-        player_position[player_index][1] = int(state_data[player_index][1])
-        player_velocity[player_index][0] = float(state_data[player_index][2])
-        player_velocity[player_index][1] = float(state_data[player_index][3])
+        player_position[player_index][0] = int(player_data[player_index][0])
+        player_position[player_index][1] = int(player_data[player_index][1])
+        player_velocity[player_index][0] = float(player_data[player_index][2])
+        player_velocity[player_index][1] = float(player_data[player_index][3])
+
+    spell_data = state_data[1]
+    spell_instances = []
+    for player_index in range(0, len(state_data)):
+        player_pending_spells[player_index] = None
+    # This if statement happens when there is no spell data, we set the array to empty to skip this whole section
+    if spell_data[0] == [""]:
+        spell_data = []
+    instance_index = 0
+    for spell_index in range(0, len(spell_data)):
+        if len(spell_data[spell_index]) == 3:
+            player_index = int(spell_data[spell_index][0])
+            player_pending_spells[player_index] = spells.instance_create(int(spell_data[spell_index][1]))
+            spells.instance_timer_set(player_pending_spells[player_index], int(spell_data[spell_index][2]))
+        else:
+            spell_instances.append(spells.instance_create(int(spell_data[spell_index][0])))
+            spell_values = []
+            spell_values.append(int(spell_data[spell_index][1]))
+            spell_values.append(int(spell_data[spell_index][2]))
+            spell_values.append(int(spell_data[spell_index][3]))
+            spell_values.append(float(spell_data[spell_index][4]))
+            spell_values.append(float(spell_data[spell_index][5]))
+            spells.instance_values_set(spell_instances[instance_index], spell_values)
+            instance_index += 1
+
+
+def spell_instances_remove(indexes):
+    for index in indexes:
+        del spell_instances[index]
 
 
 def player_count_get():
     return len(player_position)
+
+
+def spell_count_get():
+    return len(spell_instances)
 
 
 def player_rect_get(player_index):
@@ -247,6 +361,15 @@ def player_render_coordinates_get(player_index):
     player_rect[1] -= player_camera_offset[1]
 
     return [int(player_rect[0]), int(player_rect[1])]
+
+
+def player_spell_render_coordinates_get(spell_index):
+    spell_rect = spells.instance_rect_get(spell_instances[spell_index])
+
+    spell_rect[0] -= player_camera_offset[0]
+    spell_rect[1] -= player_camera_offset[1]
+
+    return spell_rect
 
 
 def player_animation_frame_get(player_index):

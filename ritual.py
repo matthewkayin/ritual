@@ -4,6 +4,7 @@ import os
 import network
 import gamestate
 import animations
+import spells
 
 # Handle cli flags
 windowed = "--windowed" in sys.argv
@@ -138,6 +139,7 @@ def game():
                     local_player_index = command[1]
 
     animations.load_all()
+    spells.spell_define_all()
     gamestate.screen_dimensions_set((SCREEN_WIDTH, SCREEN_HEIGHT))
     gamestate.map_load()
     gamestate.create_player()
@@ -177,6 +179,18 @@ def game():
                     gamestate.player_input_queue_append(local_player_index, (False, input_name))
                     if not connect_as_server:
                         network.client_event_queue.append((False, input_name))
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
+                    gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_SPELLCAST, mouse_pos))
+                    if not connect_as_server:
+                        network.client_event_queue.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
+                    gamestate.player_input_queue_append(local_player_index, (False, gamestate.INPUT_SPELLCAST, mouse_pos))
+                    if not connect_as_server:
+                        network.client_event_queue.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
             elif event.type == pygame.MOUSEMOTION:
                 gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
 
@@ -192,7 +206,8 @@ def game():
         else:
             server_data = network.client_read()
             for command in server_data:
-                gamestate.state_data_set(command)
+                if command[0] == "set_state":
+                    gamestate.state_data_set(command[1:])
 
         # Update gamestate
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
@@ -217,10 +232,15 @@ def game():
             player_coords = gamestate.player_render_coordinates_get(player_index)
             player_animation_data = gamestate.player_animation_frame_get(player_index)
             display.blit(animations.image_get_from_frame(player_animation_data), player_coords)
+
             player_rect_raw = gamestate.player_rect_get(player_index)
             player_rect_raw[0] -= gamestate.player_camera_offset[0]
             player_rect_raw[1] -= gamestate.player_camera_offset[1]
             pygame.draw.rect(display, color_red, player_rect_raw, 1)
+
+        for spell_index in range(0, gamestate.spell_count_get()):
+            spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)
+            pygame.draw.rect(display, color_red, spell_coords, False)
 
         if show_fps:
             render_fps()

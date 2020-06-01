@@ -40,8 +40,11 @@ def server_read():
             command = server_client_read_buffer[address][:terminator_index]
             server_client_read_buffer[address] = server_client_read_buffer[address][terminator_index + 1:]
 
-            command = command.split(",")
-            command_items = [int(part) for part in command]
+            command_items = command.split(",")
+            if len(command_items) == 2:
+                command_items = [int(part) for part in command_items]
+            else:
+                command_items = [int(command_items[0]), int(command_items[1]), (int(command_items[2]), int(command_items[3]))]
             server_event_queue.append([SERVER_EVENT_PLAYER_INPUT, current_player_index, command_items])
         current_player_index += 1
 
@@ -50,7 +53,7 @@ def server_write(state_data):
     global server_listener, server_client_read_buffer
 
     state_string = ""
-    for player in state_data:
+    for player in state_data[0]:
         if state_string != "":
             state_string += "&"
         player_string = ""
@@ -59,6 +62,20 @@ def server_write(state_data):
                 player_string += ","
             player_string += str(value)
         state_string += player_string
+
+    state_string += "|"
+    spell_string = ""
+    for spell in state_data[1]:
+        if spell_string != "":
+            spell_string += "&"
+        instance_string = ""
+        for value in spell:
+            if instance_string != "":
+                instance_string += ","
+            instance_string += str(value)
+        spell_string += instance_string
+    state_string += spell_string
+
     state_string += "\n"
 
     for address in server_client_read_buffer.keys():
@@ -101,10 +118,15 @@ def client_read():
             return_data.append([command_values[0], int(command_values[1])])
         else:
             return_data_entry = []
-            command_parts = command.split("&")
-            for part in command_parts:
-                command_values = part.split(",")
-                return_data_entry.append(command_values)
+            return_data_entry.append("set_state")
+
+            sections = [part.split("&") for part in command.split("|")]
+            for section in sections:
+                section_entry = []
+                for part in section:
+                    section_entry.append(part.split(","))
+                return_data_entry.append(section_entry)
+
             return_data.append(return_data_entry)
 
     return return_data
@@ -115,5 +137,10 @@ def client_write():
 
     while len(client_event_queue) != 0:
         client_event = client_event_queue.pop(0)
-        command = str(int(client_event[0])) + "," + str(client_event[1]) + "\n"
+
+        mouse_pos_string = ""
+        if len(client_event) > 2:
+            mouse_pos_string = "," + str(client_event[2][0]) + "," + str(client_event[2][1])
+
+        command = str(int(client_event[0])) + "," + str(client_event[1]) + mouse_pos_string + "\n"
         client_socket.sendto(command.encode(), client_server_address)
