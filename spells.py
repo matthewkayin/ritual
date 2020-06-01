@@ -50,6 +50,15 @@ def instance_timer_set(spell_instance, value):
     spell_instance[1] = value
 
 
+def instance_velocity_get(spell_instance):
+    return [spell_instance[4], spell_instance[5]]
+
+
+def instance_velocity_set(spell_instance, new_velocity):
+    spell_instance[4] = new_velocity[0]
+    spell_instance[5] = new_velocity[1]
+
+
 def instance_cast(spell_instance, origin, aim_vector):
     spell_instance[1] = 0
     spell_rect = instance_rect_get(spell_instance)

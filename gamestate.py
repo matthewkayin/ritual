@@ -157,6 +157,11 @@ def player_spell_cast(player_index, mouse_pos):
     instance_aim_vector = scale_vector(aim_vector, spells.spell_speed_get(spell_instance[0]))
 
     spells.instance_cast(spell_instance, spell_origin, instance_aim_vector)
+    spell_rect = spells.instance_rect_get(spell_instance)
+    for collider in map_colliders:
+        if collision_check_rectangles(spell_rect, collider):
+            player_pending_spells[player_index] = None
+            return
     spell_instances.append(spell_instance)
     player_pending_spells[player_index] = None
 
@@ -241,6 +246,23 @@ def update(delta):
         spells.instance_update(spell_instances[spell_index], delta)
         if spell_instances[spell_index][0] == spells.SPELL_DELETE_ME:
             spell_indexes_deleted_this_frame.append(spell_index)
+        else:
+            spell_rect = spells.instance_rect_get(spell_instances[spell_index])
+            for collider in map_colliders:
+                if collision_check_rectangles(spell_rect, collider):
+                    old_spell_velocity = spells.instance_velocity_get(spell_instances[spell_index])
+                    collision_still_happening = True
+                    while collision_still_happening:
+                        spell_rect[0] -= old_spell_velocity[0] * delta
+                        spell_rect[1] -= old_spell_velocity[1] * delta
+                        collision_still_happening = collision_check_rectangles(spell_rect, collider)
+                    collision_direction = collision_get_from_which_sides(spell_rect, collider)
+                    if collision_direction[0] != 0:
+                        old_spell_velocity[0] *= -1
+                    elif collision_direction[1] != 0:
+                        old_spell_velocity[1] *= -1
+                    spells.instance_velocity_set(spell_instances[spell_index], old_spell_velocity)
+                    break
     for index in spell_indexes_deleted_this_frame:
         del spell_instances[index]
 
@@ -393,3 +415,23 @@ def scale_vector(old_vector, new_magnitude):
 
 def collision_check_rectangles(rect_first, rect_second):
     return not (rect_first[0] + rect_first[2] <= rect_second[0] or rect_second[0] + rect_second[2] <= rect_first[0] or rect_first[1] + rect_first[3] <= rect_second[1] or rect_second[1] + rect_second[3] <= rect_first[1])
+
+
+def collision_get_from_which_sides(rect_first, rect_second):
+    left = rect_first[0] + rect_first[2] > rect_second[0]
+    right = rect_second[0] + rect_second[2] > rect_first[0]
+    top = rect_first[1] + rect_first[3] > rect_second[1]
+    bottom = rect_second[1] + rect_second[3] > rect_first[1]
+
+    x_direction = 0
+    if left and not right:
+        x_direction = -1
+    elif right and not left:
+        x_direction = 1
+    y_direction = 0
+    if top and not bottom:
+        y_direction = -1
+    elif bottom and not top:
+        y_direction = 1
+
+    return [x_direction, y_direction]
