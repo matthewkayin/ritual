@@ -14,16 +14,22 @@ animation_frame_duration = []
 animation_paths = ["idlewizard", "runwizard", "walkwizard"]
 
 image_map = None
+image_health_full = None
+image_health_empty = None
+image_toolbar = None
 
 
 def load_all():
-    global image_map
+    global image_map, image_health_full, image_health_empty, image_toolbar
 
     load_from_file(ANIMATION_PLAYER_IDLE, (20, 32), 14, 1.5, True)
     load_from_file(ANIMATION_PLAYER_RUN, (31, 32), 4, 0.4, True)
     load_from_file(ANIMATION_PLAYER_WALK, (24, 32), 5, 0.5, True)
 
     image_map = pygame.image.load(image_path + "testmap.png").convert()
+    image_health_full = pygame.image.load(image_path + "uifullheart.png").convert_alpha()
+    image_health_empty = pygame.image.load(image_path + "uiemptyheart.png").convert_alpha()
+    image_toolbar = pygame.image.load(image_path + "uitoolbar.png").convert_alpha()
 
 
 def load_from_file(animation_name, frame_size, frame_count, duration, has_alpha):

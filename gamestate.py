@@ -32,6 +32,9 @@ player_camera_offset = [0, 0]
 player_position = []
 player_velocity = []
 
+player_health = []
+player_display_health = []
+
 player_pending_spells = []
 player_equipped_spells = []
 player_selected_spell = []
@@ -78,6 +81,9 @@ def create_player():
 
     player_position.append([128, 400])
     player_velocity.append([0, 0])
+
+    player_health.append(100)
+    player_display_health.append(100)
 
     player_pending_spells.append(None)
     player_equipped_spells.append([0, -1, -1, -1])
@@ -265,6 +271,11 @@ def update(delta):
             player_animation_state[player_index] = desired_animation_state
         animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
 
+        # Player display health sliding
+        if player_display_health[player_index] != player_health[player_index]:
+            health_decreasing = player_display_health[player_index] > player_health[player_index]
+            player_display_health[player_index] += 3 * delta * (-1 * health_decreasing)
+
     # Update spells
     spell_indexes_deleted_this_frame = []
     for spell_index in range(0, len(spell_instances)):
@@ -288,6 +299,12 @@ def update(delta):
                         old_spell_velocity[1] *= -1
                     spells.instance_velocity_set(spell_instances[spell_index], old_spell_velocity)
                     break
+            spell_rect = spells.instance_rect_get(spell_instances[spell_index])
+            for player_index in range(0, player_count_get()):
+                player_rect = player_rect_get(player_index)
+                if collision_check_rectangles(spell_rect, player_rect):
+                    player_health[player_index] -= spells.instance_damage_get(spell_instances[spell_index])
+                    spell_instances[spell_index][0] = spells.SPELL_DELETE_ME
     for index in spell_indexes_deleted_this_frame:
         del spell_instances[index]
 
@@ -422,6 +439,10 @@ def player_spell_charge_percentage_get(player_index):
         return 0
     else:
         return spells.instance_timer_percentage_get(player_pending_spells[player_index])
+
+
+def player_health_percentage_get(player_index):
+    return max(0, player_display_health[player_index]) / 100
 
 
 def player_spell_render_coordinates_get(spell_index):

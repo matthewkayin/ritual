@@ -223,11 +223,10 @@ def game():
 
         display_clear()
 
+        # Draw map
         display.blit(animations.image_map, (0 - gamestate.player_camera_offset[0], 0 - gamestate.player_camera_offset[1]))
 
-        for collider in gamestate.map_colliders:
-            pygame.draw.rect(display, color_yellow, (collider[0] - gamestate.player_camera_offset[0], collider[1] - gamestate.player_camera_offset[1], collider[2], collider[3]), False)
-
+        # Draw players
         for player_index in range(0, gamestate.player_count_get()):
             player_coords = gamestate.player_render_coordinates_get(player_index)
             player_frame = animations.image_get_from_frame(gamestate.player_animation_frame_get(player_index))
@@ -245,9 +244,24 @@ def game():
                     charge_bar_rect[2] = 40 * player_charge_percent
                     pygame.draw.rect(display, color_black, charge_bar_rect, False)
 
+        # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):
             spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)
             pygame.draw.rect(display, color_red, spell_coords, False)
+
+        # Draw UI
+        player_health = gamestate.player_health_percentage_get(local_player_index)
+        if player_health == 1:
+            display.blit(animations.image_health_full, (0, 0))
+        elif player_health == 0:
+            display.blit(animations.image_health_empty, (0, 0))
+        else:
+            heart_width = animations.image_health_full.get_width()
+            heart_height = animations.image_health_full.get_height()
+            empty_height = int(heart_height * (1 - player_health))
+            display.blit(animations.image_health_empty.subsurface(0, 0, heart_width, empty_height), (0, 0))
+            display.blit(animations.image_health_full.subsurface(0, empty_height, heart_width, heart_height - empty_height), (0, empty_height))
+        display.blit(animations.image_toolbar, (0, 0))
 
         if show_fps:
             render_fps()

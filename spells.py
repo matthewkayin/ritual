@@ -27,7 +27,7 @@ def spell_define(name, charge_type, charge_time, cooldown_time, time_to_live, si
 
 
 def spell_define_all():
-    spell_define(SPELL_MAGIC_MISSILE, CHARGE_PARTIAL_CAST, 1.0, 3.0, 3.0, (10, 10), 5, 60)
+    spell_define(SPELL_MAGIC_MISSILE, CHARGE_PARTIAL_CAST, 1.0, 3.0, 3.0, (10, 10), 5, 30)
 
 
 def spell_charge_type_get(spell_name):
@@ -111,3 +111,7 @@ def instance_update(spell_instance, delta, is_cast=True):
 def instance_rect_get(spell_instance):
     instance_size = spell_size[spell_instance[0]]
     return [int(spell_instance[2]), int(spell_instance[3]), instance_size[0], instance_size[1]]
+
+
+def instance_damage_get(spell_instance):
+    return spell_damage[spell_instance[0]]
