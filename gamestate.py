@@ -18,9 +18,7 @@ player_input_direction = []
 screen_dimensions = []
 screen_center = []
 
-player_animation_idle = []
-player_animation_run = []
-player_animation_walk = []
+player_animations = []
 player_animation_state = []
 player_animation_flipped = []
 
@@ -28,6 +26,7 @@ player_size_idle = [4, 6, 15, 26]
 player_size_run = [-10, 1, 20, 32]
 player_size_walk = [1, 1, 24, 32]
 PLAYER_SPEED = 3
+PLAYER_WALK_SPEED = 1
 
 player_camera_offset = [0, 0]
 player_position = []
@@ -68,8 +67,12 @@ def create_player():
     player_input_state.append([False, False, False, False, False])
     player_input_direction.append([0, 0])
 
-    player_animation_idle.append(animations.instance_create(animations.ANIMATION_PLAYER_IDLE))
-    player_animation_run.append(animations.instance_create(animations.ANIMATION_PLAYER_RUN))
+    new_animations = []
+    new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_IDLE))
+    new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_RUN))
+    new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_WALK))
+
+    player_animations.append(new_animations)
     player_animation_state.append(0)
     player_animation_flipped.append(False)
 
@@ -113,6 +116,8 @@ def player_input_handle(player_index, input_event):
                 player_pending_spells[player_index] = new_spell_instance
                 if spells.instance_can_instant_cast(new_spell_instance):
                     player_spell_cast(player_index, mouse_pos)
+                else:
+                    update_player_velocity = True
         player_input_state[player_index][input_event_name] = True
     else:
         if input_event_name == INPUT_UP:
@@ -145,10 +150,14 @@ def player_input_handle(player_index, input_event):
                     player_spell_cast(player_index, mouse_pos)
                 else:
                     player_pending_spells[player_index] = None
+                update_player_velocity = True
         player_input_state[player_index][input_event_name] = False
 
     if update_player_velocity:
-        player_velocity[player_index] = scale_vector(player_input_direction[player_index], PLAYER_SPEED)
+        speed_magnitude = PLAYER_SPEED
+        if player_pending_spells[player_index] is not None:
+            speed_magnitude = PLAYER_WALK_SPEED
+        player_velocity[player_index] = scale_vector(player_input_direction[player_index], speed_magnitude)
 
 
 def player_spell_cast(player_index, mouse_pos):
@@ -242,20 +251,19 @@ def update(delta):
             player_animation_flipped[player_index] = False
         elif not player_animation_flipped[player_index] and player_velocity[player_index][0] < 0:
             player_animation_flipped[player_index] = True
-        if player_animation_state[player_index] == 0:
-            if player_velocity[player_index][0] == 0 and player_velocity[player_index][1] == 0:
-                animations.instance_update(player_animation_idle[player_index], delta)
+
+        desired_animation_state = 0
+        if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
+            if player_pending_spells[player_index] is None:
+                desired_animation_state = 1
             else:
-                animations.instance_reset(player_animation_idle[player_index])
-                player_animation_state[player_index] = 1
-                animations.instance_update(player_animation_run[player_index], delta)
-        elif player_animation_state[player_index] == 1:
-            if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
-                animations.instance_update(player_animation_run[player_index], delta)
-            else:
-                animations.instance_reset(player_animation_run[player_index])
-                player_animation_state[player_index] = 0
-                animations.instance_update(player_animation_idle[player_index], delta)
+                desired_animation_state = 2
+
+        current_animation_state = player_animation_state[player_index]
+        if current_animation_state != desired_animation_state:
+            animations.instance_reset(player_animations[player_index][current_animation_state])
+            player_animation_state[player_index] = desired_animation_state
+        animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
 
     # Update spells
     spell_indexes_deleted_this_frame = []
@@ -391,10 +399,17 @@ def player_render_coordinates_get(player_index):
     player_rect[0] -= 4
     player_rect[1] -= 6
 
-    if player_animation_state[player_index] == 1 and not player_animation_flipped[player_index]:
-        player_rect[0] -= 8
-    elif player_animation_state[player_index] == 0 and player_animation_flipped[player_index]:
-        player_rect[0] += 3
+    animation_state = player_animation_state[player_index]
+    if player_animation_flipped[player_index]:
+        if animation_state == 0:
+            player_rect[0] += 3
+        elif animation_state == 2:
+            player_rect[0] += 3
+    else:
+        if animation_state == 1:
+            player_rect[0] -= 8
+        elif animation_state == 2:
+            player_rect[0] -= 4
 
     player_rect[0] -= player_camera_offset[0]
     player_rect[1] -= player_camera_offset[1]
@@ -419,14 +434,7 @@ def player_spell_render_coordinates_get(spell_index):
 
 
 def player_animation_frame_get(player_index):
-    global player_animation_state, player_animation_flipped, player_animation_idle, player_animation_run, player_animation_walk
-
-    if player_animation_state[player_index] == 0:
-        return animations.instance_frame_get(player_animation_idle[player_index], player_animation_flipped[player_index])
-    elif player_animation_state[player_index] == 1:
-        return animations.instance_frame_get(player_animation_run[player_index], player_animation_flipped[player_index])
-
-    return []
+    return animations.instance_frame_get(player_animations[player_index][player_animation_state[player_index]], player_animation_flipped[player_index])
 
 
 def scale_vector(old_vector, new_magnitude):

@@ -233,17 +233,17 @@ def game():
             player_frame = animations.image_get_from_frame(gamestate.player_animation_frame_get(player_index))
             display.blit(player_frame, player_coords)
 
-            if player_index == local_player_index:
-                player_charge_percent = gamestate.player_spell_charge_percentage_get(player_index)
-                if player_charge_percent != 0:
-                    charge_bar_rect = [player_coords[0] - (player_frame.get_width() // 2), player_coords[1] - 15, 40, 10]
-                    charge_bar_rect[2] = 40 * player_charge_percent
-                    pygame.draw.rect(display, color_black, charge_bar_rect, False)
-
             player_rect_raw = gamestate.player_rect_get(player_index)
             player_rect_raw[0] -= gamestate.player_camera_offset[0]
             player_rect_raw[1] -= gamestate.player_camera_offset[1]
             pygame.draw.rect(display, color_red, player_rect_raw, 1)
+
+            if player_index == local_player_index:
+                player_charge_percent = gamestate.player_spell_charge_percentage_get(player_index)
+                if player_charge_percent != 0:
+                    charge_bar_rect = [player_rect_raw[0] - (player_rect_raw[2] // 2), player_rect_raw[1] - 20, 40, 10]
+                    charge_bar_rect[2] = 40 * player_charge_percent
+                    pygame.draw.rect(display, color_black, charge_bar_rect, False)
 
         for spell_index in range(0, gamestate.spell_count_get()):
             spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)

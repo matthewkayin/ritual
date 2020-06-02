@@ -21,7 +21,7 @@ def load_all():
 
     load_from_file(ANIMATION_PLAYER_IDLE, (20, 32), 14, 1.5, True)
     load_from_file(ANIMATION_PLAYER_RUN, (31, 32), 4, 0.4, True)
-    load_from_file(ANIMATION_PLAYER_WALK, (24, 32), 5, 1.2, True)
+    load_from_file(ANIMATION_PLAYER_WALK, (24, 32), 5, 0.5, True)
 
     image_map = pygame.image.load(image_path + "testmap.png").convert()
 
