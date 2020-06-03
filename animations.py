@@ -9,6 +9,7 @@ ANIMATION_PLAYER_CAST_MISSILE = 3
 ANIMATION_PLAYER_IDLE_BOOK_MISSILE = 4
 ANIMATION_PLAYER_RUN_BOOK_MISSILE = 5
 ANIMATION_PLAYER_WALK_BOOK_MISSILE = 6
+ANIMATION_SPELL_MAGIC_MISSILE = 7
 
 animation_frames = []
 animation_frame_size = []
@@ -16,7 +17,7 @@ animation_frame_count = []
 animation_frame_duration = []
 animation_loops = []
 
-animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile"]
+animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile", "magicmissile"]
 
 image_map = None
 image_health_full = None
@@ -36,6 +37,7 @@ def load_all():
     load_from_file(ANIMATION_PLAYER_IDLE_BOOK_MISSILE, (22, 32), 14, 1.5, True, True)
     load_from_file(ANIMATION_PLAYER_RUN_BOOK_MISSILE, (31, 32), 4, 0.4, True, True)
     load_from_file(ANIMATION_PLAYER_WALK_BOOK_MISSILE, (27, 32), 5, 0.5, True, True)
+    load_from_file(ANIMATION_SPELL_MAGIC_MISSILE, (32, 9), 3, 0.3, True, True)
 
     image_map = pygame.image.load(image_path + "testmap.png").convert()
     image_health_full = pygame.image.load(image_path + "uifullheart.png").convert_alpha()
@@ -108,3 +110,26 @@ def instance_get_frame_image(animation_instance, is_flipped):
     global animation_frames
 
     return pygame.transform.flip(animation_frames[animation_instance[0]][animation_instance[2]], is_flipped, False)
+
+
+def instance_get_rotated_frame_image(animation_instance, angle, origin_pos=None):
+    image = animation_frames[animation_instance[0]][animation_instance[2]]
+    if origin_pos is None:
+        origin_pos = image.get_rect().center
+
+    # calculate the axis aligned bounding box of the rotated image
+    w, h = image.get_size()
+    box = [pygame.math.Vector2(p) for p in [(0, 0), (w, 0), (w, -h), (0, -h)]]
+    box_rotate = [p.rotate(angle) for p in box]
+    min_box = (min(box_rotate, key=lambda p: p[0])[0], min(box_rotate, key=lambda p: p[1])[1])
+    max_box = (max(box_rotate, key=lambda p: p[0])[0], max(box_rotate, key=lambda p: p[1])[1])
+
+    # calculate the translation of the pivot
+    pivot = pygame.math.Vector2(origin_pos[0], -origin_pos[1])
+    pivot_rotate = pivot.rotate(angle)
+    pivot_move = pivot_rotate - pivot
+
+    rotated_image = pygame.transform.rotate(image, angle)
+    offset = (int(min_box[0] - origin_pos[0] - pivot_move[0]), int(pivot_move[1] - max_box[1] - origin_pos[1]))
+
+    return rotated_image, offset

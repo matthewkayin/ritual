@@ -249,8 +249,10 @@ def game():
 
         # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):
-            spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)
-            pygame.draw.rect(display, color_red, spell_coords, False)
+            # spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)
+            # pygame.draw.rect(display, color_red, spell_coords, False)
+            spell_image, spell_coords = gamestate.spell_render_image_get(spell_index)
+            display.blit(spell_image, spell_coords)
 
         # Draw UI
         player_health = gamestate.player_health_percentage_get(local_player_index)
