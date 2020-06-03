@@ -495,7 +495,18 @@ def player_spell_render_coordinates_get(spell_index):
 
 
 def player_animation_frame_get(player_index):
-    return animations.instance_frame_get(player_animations[player_index][player_animation_state[player_index]], player_animation_flipped[player_index])
+    return animations.instance_get_frame_image(player_animations[player_index][player_animation_state[player_index]], player_animation_flipped[player_index])
+
+
+def player_animation_frame_book_get(player_index):
+    if player_animation_state[player_index] == 3:
+        return None
+    animation_instance = player_animations[player_index][player_animation_state[player_index]]
+    book_instance = []
+    for i in range(0, len(animation_instance)):
+        book_instance.append(animation_instance[i])
+    book_instance[0] += 4
+    return animations.instance_get_frame_image(book_instance, player_animation_flipped[player_index])
 
 
 def scale_vector(old_vector, new_magnitude):

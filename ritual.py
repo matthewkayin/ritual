@@ -236,20 +236,16 @@ def game():
         # Draw players
         for player_index in range(0, gamestate.player_count_get()):
             player_coords = gamestate.player_render_coordinates_get(player_index)
-            player_frame = animations.image_get_from_frame(gamestate.player_animation_frame_get(player_index))
+            player_frame = gamestate.player_animation_frame_get(player_index)
+            player_book_frame = gamestate.player_animation_frame_book_get(player_index)
             display.blit(player_frame, player_coords)
+            if player_book_frame is not None:
+                display.blit(player_book_frame, player_coords)
 
-            player_rect_raw = gamestate.player_rect_get(player_index)
-            player_rect_raw[0] -= gamestate.player_camera_offset[0]
-            player_rect_raw[1] -= gamestate.player_camera_offset[1]
-            pygame.draw.rect(display, color_red, player_rect_raw, 1)
-
-            if player_index == local_player_index:
-                player_charge_percent = gamestate.player_spell_charge_percentage_get(player_index)
-                if player_charge_percent != 0:
-                    charge_bar_rect = [player_rect_raw[0] - (player_rect_raw[2] // 2), player_rect_raw[1] - 20, 40, 10]
-                    charge_bar_rect[2] = 40 * player_charge_percent
-                    pygame.draw.rect(display, color_black, charge_bar_rect, False)
+            # player_rect_raw = gamestate.player_rect_get(player_index)
+            # player_rect_raw[0] -= gamestate.player_camera_offset[0]
+            # player_rect_raw[1] -= gamestate.player_camera_offset[1]
+            # pygame.draw.rect(display, color_red, player_rect_raw, 1)
 
         # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):
@@ -269,6 +265,17 @@ def game():
             display.blit(animations.image_health_empty.subsurface(0, 0, heart_width, empty_height), (0, 0))
             display.blit(animations.image_health_full.subsurface(0, empty_height, heart_width, heart_height - empty_height), (0, empty_height))
         display.blit(animations.image_toolbar, (0, 0))
+        player_charge_percent = gamestate.player_spell_charge_percentage_get(local_player_index)
+        if player_charge_percent == 1:
+            display.blit(animations.image_chargebar_full, (0, 0))
+        if player_charge_percent == 0:
+            display.blit(animations.image_chargebar_empty, (0, 0))
+        else:
+            charge_width = animations.image_chargebar_full.get_width()
+            charge_height = animations.image_chargebar_full.get_height()
+            full_width = int(charge_width * player_charge_percent)
+            display.blit(animations.image_chargebar_full.subsurface(0, 0, full_width, charge_height), (0, 0))
+            display.blit(animations.image_chargebar_empty.subsurface(full_width, 0, charge_width - full_width, charge_height), (full_width, 0))
 
         if show_fps:
             render_fps()

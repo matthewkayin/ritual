@@ -6,6 +6,9 @@ ANIMATION_PLAYER_IDLE = 0
 ANIMATION_PLAYER_RUN = 1
 ANIMATION_PLAYER_WALK = 2
 ANIMATION_PLAYER_CAST_MISSILE = 3
+ANIMATION_PLAYER_IDLE_BOOK_MISSILE = 4
+ANIMATION_PLAYER_RUN_BOOK_MISSILE = 5
+ANIMATION_PLAYER_WALK_BOOK_MISSILE = 6
 
 animation_frames = []
 animation_frame_size = []
@@ -13,26 +16,33 @@ animation_frame_count = []
 animation_frame_duration = []
 animation_loops = []
 
-animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile"]
+animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile"]
 
 image_map = None
 image_health_full = None
 image_health_empty = None
 image_toolbar = None
+image_chargebar_full = None
+image_chargebar_empty = None
 
 
 def load_all():
-    global image_map, image_health_full, image_health_empty, image_toolbar
+    global image_map, image_health_full, image_health_empty, image_toolbar, image_chargebar_full, image_chargebar_empty
 
-    load_from_file(ANIMATION_PLAYER_IDLE, (20, 32), 14, 1.5, True, True)
+    load_from_file(ANIMATION_PLAYER_IDLE, (22, 32), 14, 1.5, True, True)
     load_from_file(ANIMATION_PLAYER_RUN, (31, 32), 4, 0.4, True, True)
     load_from_file(ANIMATION_PLAYER_WALK, (27, 32), 5, 0.5, True, True)
     load_from_file(ANIMATION_PLAYER_CAST_MISSILE, (31, 31), 7, 0.8, False, True)
+    load_from_file(ANIMATION_PLAYER_IDLE_BOOK_MISSILE, (22, 32), 14, 1.5, True, True)
+    load_from_file(ANIMATION_PLAYER_RUN_BOOK_MISSILE, (31, 32), 4, 0.4, True, True)
+    load_from_file(ANIMATION_PLAYER_WALK_BOOK_MISSILE, (27, 32), 5, 0.5, True, True)
 
     image_map = pygame.image.load(image_path + "testmap.png").convert()
     image_health_full = pygame.image.load(image_path + "uifullheart.png").convert_alpha()
     image_health_empty = pygame.image.load(image_path + "uiemptyheart.png").convert_alpha()
     image_toolbar = pygame.image.load(image_path + "uitoolbar.png").convert_alpha()
+    image_chargebar_full = pygame.image.load(image_path + "uichargebarfull.png").convert_alpha()
+    image_chargebar_empty = pygame.image.load(image_path + "uichargebar.png").convert_alpha()
 
 
 def load_from_file(animation_name, frame_size, frame_count, duration, looping, has_alpha):
@@ -83,10 +93,6 @@ def instance_update(animation_instance, delta):
                 animation_instance[2] -= 1
 
 
-def instance_frame_get(animation_instance, is_flipped):
-    return [animation_instance[0], animation_instance[2], is_flipped]
-
-
 def instance_finished(animation_instance):
     return (not animation_loops[animation_instance[0]]) and animation_instance[2] >= animation_frame_count[animation_instance[0]] - 1
 
@@ -98,7 +104,7 @@ def instance_cast_animation_ready(animation_instance):
         return False
 
 
-def image_get_from_frame(animation_data):
+def instance_get_frame_image(animation_instance, is_flipped):
     global animation_frames
 
-    return pygame.transform.flip(animation_frames[animation_data[0]][animation_data[1]], animation_data[2], False)
+    return pygame.transform.flip(animation_frames[animation_instance[0]][animation_instance[2]], is_flipped, False)
