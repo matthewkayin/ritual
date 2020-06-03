@@ -7,6 +7,7 @@ SERVER_EVENT_PLAYER_INPUT = 1
 server_listener = None
 server_event_queue = []
 server_client_read_buffer = {}
+server_client_ping = {}
 
 
 def server_begin(port):
@@ -25,9 +26,11 @@ def server_read():
         message, address = ready_socket.recvfrom(1024)
         if address in list(server_client_read_buffer.keys()):
             server_client_read_buffer[address] += message.decode()
+            server_client_ping[address] = True
         else:
             next_player_index = len(server_client_read_buffer.keys()) + 1
             server_client_read_buffer[address] = ""
+            server_client_ping[address] = True
             server_event_queue.append([SERVER_EVENT_NEW_PLAYER])
             response = "ack," + str(next_player_index) + "\n"
             server_listener.sendto(response.encode(), address)
@@ -39,6 +42,9 @@ def server_read():
             terminator_index = server_client_read_buffer[address].index("\n")
             command = server_client_read_buffer[address][:terminator_index]
             server_client_read_buffer[address] = server_client_read_buffer[address][terminator_index + 1:]
+
+            if command == "e":
+                continue
 
             command_items = command.split(",")
             if len(command_items) == 2:
@@ -79,7 +85,9 @@ def server_write(state_data):
     state_string += "\n"
 
     for address in server_client_read_buffer.keys():
-        server_listener.sendto(state_string.encode(), address)
+        if server_client_ping[address]:
+            server_listener.sendto(state_string.encode(), address)
+            server_client_ping[address] = False
 
 
 client_socket = None
@@ -135,6 +143,8 @@ def client_read():
 def client_write():
     global client_socket, client_server_address, client_event_queue
 
+    if len(client_event_queue) == 0:
+        client_socket.sendto("e\n".encode(), client_server_address)
     while len(client_event_queue) != 0:
         client_event = client_event_queue.pop(0)
 

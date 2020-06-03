@@ -21,6 +21,7 @@ screen_center = []
 player_animations = []
 player_animation_state = []
 player_animation_flipped = []
+player_animation_windup = []
 
 player_size_idle = [4, 6, 15, 26]
 player_size_run = [-10, 1, 20, 32]
@@ -36,6 +37,7 @@ player_health = []
 player_display_health = []
 
 player_pending_spells = []
+player_pending_spell_aim = []
 player_equipped_spells = []
 player_selected_spell = []
 player_spell_cooldown_timers = []
@@ -74,10 +76,12 @@ def create_player():
     new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_IDLE))
     new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_RUN))
     new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_WALK))
+    new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_CAST_MISSILE))
 
     player_animations.append(new_animations)
     player_animation_state.append(0)
     player_animation_flipped.append(False)
+    player_animation_windup.append(False)
 
     player_position.append([128, 400])
     player_velocity.append([0, 0])
@@ -86,6 +90,7 @@ def create_player():
     player_display_health.append(100)
 
     player_pending_spells.append(None)
+    player_pending_spell_aim.append([0, 0])
     player_equipped_spells.append([0, -1, -1, -1])
     player_selected_spell.append(0)
     player_spell_cooldown_timers.append([-1, -1, -1, -1])
@@ -121,7 +126,9 @@ def player_input_handle(player_index, input_event):
                 new_spell_instance = spells.instance_create(spell_name)
                 player_pending_spells[player_index] = new_spell_instance
                 if spells.instance_can_instant_cast(new_spell_instance):
-                    player_spell_cast(player_index, mouse_pos)
+                    player_animation_windup[player_index] = True
+                    player_pending_spell_aim[player_index] = mouse_pos
+                    update_player_velocity = True
                 else:
                     update_player_velocity = True
         player_input_state[player_index][input_event_name] = True
@@ -153,17 +160,15 @@ def player_input_handle(player_index, input_event):
         elif input_event_name == INPUT_SPELLCAST:
             if player_pending_spells[player_index] is not None:
                 if spells.instance_cast_ready(player_pending_spells[player_index]):
-                    player_spell_cast(player_index, mouse_pos)
+                    player_animation_windup[player_index] = True
+                    player_pending_spell_aim[player_index] = mouse_pos
                 else:
                     player_pending_spells[player_index] = None
                 update_player_velocity = True
         player_input_state[player_index][input_event_name] = False
 
     if update_player_velocity:
-        speed_magnitude = PLAYER_SPEED
-        if player_pending_spells[player_index] is not None:
-            speed_magnitude = PLAYER_WALK_SPEED
-        player_velocity[player_index] = scale_vector(player_input_direction[player_index], speed_magnitude)
+        player_velocity_update(player_index)
 
 
 def player_spell_cast(player_index, mouse_pos):
@@ -188,6 +193,17 @@ def player_spell_cast(player_index, mouse_pos):
     spell_instances.append(spell_instance)
     player_pending_spells[player_index] = None
     player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] = 0
+
+
+def player_velocity_update(player_index):
+    if player_animation_windup[player_index]:
+        player_velocity[player_index][0] = 0
+        player_velocity[player_index][1] = 0
+    else:
+        speed_magnitude = PLAYER_SPEED
+        if player_pending_spells[player_index] is not None:
+            speed_magnitude = PLAYER_WALK_SPEED
+        player_velocity[player_index] = scale_vector(player_input_direction[player_index], speed_magnitude)
 
 
 def player_input_mouse_position_set(new_mouse_x, new_mouse_y):
@@ -264,12 +280,26 @@ def update(delta):
                 desired_animation_state = 1
             else:
                 desired_animation_state = 2
+        else:
+            if player_animation_state[player_index] == 3:
+                if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
+                    desired_animation_state = 0
+                else:
+                    desired_animation_state = 3
+            elif player_animation_windup[player_index] or player_animation_state[player_index] == 3:
+                desired_animation_state = 3
 
         current_animation_state = player_animation_state[player_index]
         if current_animation_state != desired_animation_state:
             animations.instance_reset(player_animations[player_index][current_animation_state])
             player_animation_state[player_index] = desired_animation_state
         animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
+
+        if player_animation_windup[player_index]:
+            if animations.instance_cast_animation_ready(player_animations[player_index][player_animation_state[player_index]]):
+                player_spell_cast(player_index, player_pending_spell_aim[player_index])
+                player_animation_windup[player_index] = False
+                player_velocity_update(player_index)
 
         # Player display health sliding
         if player_display_health[player_index] != player_health[player_index]:
@@ -327,6 +357,7 @@ def state_data_get():
         player_data_entry.append(int(player_position[player_index][1]))
         player_data_entry.append(round(player_velocity[player_index][0], 2))
         player_data_entry.append(round(player_velocity[player_index][1], 2))
+        player_data_entry.append(int(player_health[player_index]))
 
         player_data.append(player_data_entry)
     state_data.append(player_data)
@@ -339,6 +370,7 @@ def state_data_get():
             spell_data_entry.append(int(player_index))
             spell_data_entry.append(int(player_pending_spells[player_index][0]))
             spell_data_entry.append(int(player_pending_spells[player_index][1]))
+            spell_data_entry.append(int(player_animation_windup[player_index]))
 
             spell_data.append(spell_data_entry)
     for spell_index in range(0, spell_count_get()):
@@ -368,6 +400,7 @@ def state_data_set(state_data):
         player_position[player_index][1] = int(player_data[player_index][1])
         player_velocity[player_index][0] = float(player_data[player_index][2])
         player_velocity[player_index][1] = float(player_data[player_index][3])
+        player_health[player_index] = int(player_data[player_index][4])
 
     spell_data = state_data[1]
     spell_instances = []
@@ -378,10 +411,11 @@ def state_data_set(state_data):
         spell_data = []
     instance_index = 0
     for spell_index in range(0, len(spell_data)):
-        if len(spell_data[spell_index]) == 3:
+        if len(spell_data[spell_index]) == 4:
             player_index = int(spell_data[spell_index][0])
             player_pending_spells[player_index] = spells.instance_create(int(spell_data[spell_index][1]))
             spells.instance_timer_set(player_pending_spells[player_index], int(spell_data[spell_index][2]))
+            player_animation_windup[player_index] = bool(int(spell_data[spell_index][3]))
         else:
             spell_instances.append(spells.instance_create(int(spell_data[spell_index][0])))
             spell_values = []
@@ -392,6 +426,10 @@ def state_data_set(state_data):
             spell_values.append(float(spell_data[spell_index][5]))
             spells.instance_values_set(spell_instances[instance_index], spell_values)
             instance_index += 1
+
+    for player_index in range(0, len(state_data)):
+        if player_animation_windup[player_index] and player_pending_spells[player_index] is None:
+            player_animation_windup[player_index] = False
 
 
 def spell_instances_remove(indexes):
@@ -420,13 +458,15 @@ def player_render_coordinates_get(player_index):
     if player_animation_flipped[player_index]:
         if animation_state == 0:
             player_rect[0] += 3
-        elif animation_state == 2:
-            player_rect[0] += 3
+        elif animation_state == 3:
+            player_rect[0] -= 3
     else:
         if animation_state == 1:
             player_rect[0] -= 8
         elif animation_state == 2:
             player_rect[0] -= 4
+        elif animation_state == 3:
+            player_rect[0] -= 5
 
     player_rect[0] -= player_camera_offset[0]
     player_rect[1] -= player_camera_offset[1]

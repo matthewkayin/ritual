@@ -35,6 +35,8 @@ clock = pygame.time.Clock()
 
 # Timing variables
 before_time = 0
+ping_before_time = 0
+ping = 0
 UPDATE_TIME = 1000 / 60.0
 TARGET_FPS = 60
 
@@ -121,7 +123,7 @@ def menu():
 
 
 def game():
-    global connect_as_server
+    global connect_as_server, ping
 
     running = True
     return_gamestate = GAMESTATE_EXIT
@@ -145,6 +147,7 @@ def game():
     gamestate.create_player()
 
     before_time = pygame.time.get_ticks()
+    ping_before_time = before_time
 
     while running:
         # Input
@@ -205,6 +208,9 @@ def game():
                     gamestate.player_input_queue_append(server_event[1], server_event[2])
         else:
             server_data = network.client_read()
+
+            ping = pygame.time.get_ticks() - ping_before_time
+
             for command in server_data:
                 if command[0] == "set_state":
                     gamestate.state_data_set(command[1:])
@@ -219,6 +225,7 @@ def game():
         if connect_as_server:
             network.server_write(gamestate.state_data_get())
         else:
+            ping_before_time = pygame.time.get_ticks()
             network.client_write()
 
         display_clear()
@@ -287,7 +294,7 @@ def display_flip():
 
 
 def render_fps():
-    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())), False, color_yellow)
+    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())) + "  Ping: " + str(ping), False, color_yellow)
     display.blit(text_fps, (0, 0))
 
 
