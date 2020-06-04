@@ -148,6 +148,7 @@ def game():
 
     before_time = pygame.time.get_ticks()
     ping_before_time = before_time
+    pinging = False
 
     while running:
         # Input
@@ -196,6 +197,7 @@ def game():
                         network.client_event_queue.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
             elif event.type == pygame.MOUSEMOTION:
                 gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
+        gamestate.player_input_queue_pump_events(local_player_index)
 
         # Read network
         if connect_as_server:
@@ -210,6 +212,7 @@ def game():
             server_data = network.client_read()
 
             ping = pygame.time.get_ticks() - ping_before_time
+            pinging = False
 
             for command in server_data:
                 if command[0] == "set_state":
@@ -225,8 +228,10 @@ def game():
         if connect_as_server:
             network.server_write(gamestate.state_data_get())
         else:
-            ping_before_time = pygame.time.get_ticks()
-            network.client_write()
+            if not pinging:
+                ping_before_time = pygame.time.get_ticks()
+                pinging = True
+                network.client_write()
 
         display_clear()
 
@@ -250,7 +255,10 @@ def game():
         # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):
             # spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)
-            # pygame.draw.rect(display, color_red, spell_coords, False)
+            spell_rect = spells.instance_rect_get(gamestate.spell_instances[spell_index])
+            spell_rect[0] -= gamestate.player_camera_offset[0]
+            spell_rect[1] -= gamestate.player_camera_offset[1]
+            pygame.draw.rect(display, color_red, spell_rect, 1)
             spell_image, spell_coords = gamestate.spell_render_image_get(spell_index)
             display.blit(spell_image, spell_coords)
 

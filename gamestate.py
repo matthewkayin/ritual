@@ -218,12 +218,21 @@ def player_input_offset_mouse_position_get(mouse_x, mouse_y):
     return [int(mouse_x + player_camera_offset[0]), int(mouse_y + player_camera_offset[1])]
 
 
-def update(delta):
-    for player_index in range(0, player_count_get()):
-        # Handle input queue
+def player_input_queue_pump_events(player_index=-1):
+    if player_index == -1:
+        for player_index in range(0, player_count_get()):
+            while len(player_input_queue[player_index]) != 0:
+                input_event = player_input_queue[player_index].pop(0)
+                player_input_handle(player_index, input_event)
+    elif player_index in range(0, player_count_get()):
         while len(player_input_queue[player_index]) != 0:
             input_event = player_input_queue[player_index].pop(0)
             player_input_handle(player_index, input_event)
+
+
+def update(delta):
+    for player_index in range(0, player_count_get()):
+        player_input_queue_pump_events()
 
         # Update player position
         player_position[player_index][0] += player_velocity[player_index][0] * delta
@@ -395,7 +404,7 @@ def state_data_get():
 
 
 def state_data_set(state_data):
-    global spell_instances
+    global spell_instances, spell_animation_instances
 
     player_data = state_data[0]
     for player_index in range(0, len(state_data)):
@@ -409,6 +418,7 @@ def state_data_set(state_data):
 
     spell_data = state_data[1]
     spell_instances = []
+    spell_animation_instances = []
     for player_index in range(0, len(state_data)):
         player_pending_spells[player_index] = None
     # This if statement happens when there is no spell data, we set the array to empty to skip this whole section
@@ -430,6 +440,7 @@ def state_data_set(state_data):
             spell_values.append(float(spell_data[spell_index][4]))
             spell_values.append(float(spell_data[spell_index][5]))
             spells.instance_values_set(spell_instances[instance_index], spell_values)
+            spell_animation_instances.append(animations.instance_create_with_timer(spells.spell_animation_name[spell_instances[instance_index][0]], spell_instances[instance_index][1]))
             instance_index += 1
 
     for player_index in range(0, len(state_data)):
@@ -491,6 +502,7 @@ def player_health_percentage_get(player_index):
 
 
 def spell_render_image_get(spell_index):
+    spell_rect = spells.instance_rect_get(spell_instances[spell_index])
     spell_velocity = spells.instance_velocity_get(spell_instances[spell_index])
     angle = math.degrees(math.atan2(spell_velocity[1], spell_velocity[0])) * -1
     image, offset = animations.instance_get_rotated_frame_image(spell_animation_instances[spell_index], angle)

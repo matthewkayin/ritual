@@ -76,6 +76,14 @@ def instance_create(animation_name):
     return [animation_name, 0, 0]
 
 
+def instance_create_with_timer(animation_name, timer):
+    frames_passed = timer % animation_frame_duration[animation_name]
+    current_frame = frames_passed % animation_frame_count[animation_name]
+    time_left = timer - (frames_passed * animation_frame_duration[animation_name])
+
+    return [animation_name, time_left, current_frame]
+
+
 def instance_reset(animation_instance):
     animation_instance[1] = 0
     animation_instance[2] = 0

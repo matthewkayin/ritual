@@ -106,7 +106,7 @@ def client_connect(server_ip, server_port):
 
 
 def client_read():
-    global client_socket, client_connected, client_server_buffer
+    global client_socket, client_connected, client_server_buffer, client_most_recent_tick
 
     return_data = []
 
