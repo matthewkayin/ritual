@@ -19,8 +19,18 @@ server_client_ping = {}
 def server_begin(port):
     global server_listener
 
+    server_ip = "127.0.0.1"
+    server_finder = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        server_finder.connect(('10.255.255.255', 1))
+        server_ip = server_finder.getsockname()[0]
+    except Exception:
+        server_ip = "127.0.0.1"
+    finally:
+        server_finder.close()
+
     server_listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_listener.bind(("127.0.0.1", port))
+    server_listener.bind((server_ip, port))
 
 
 def server_set_username(username):

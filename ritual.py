@@ -397,7 +397,7 @@ def game():
             player_rect_raw = gamestate.player_rect_get(player_index)
             player_rect_raw[0] -= gamestate.player_camera_offset[0]
             player_rect_raw[1] -= gamestate.player_camera_offset[1]
-            pygame.draw.rect(display, color_red, player_rect_raw, 1)
+            # pygame.draw.rect(display, color_red, player_rect_raw, 1)
 
         # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):
