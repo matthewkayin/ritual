@@ -10,6 +10,8 @@ ANIMATION_PLAYER_IDLE_BOOK_MISSILE = 4
 ANIMATION_PLAYER_RUN_BOOK_MISSILE = 5
 ANIMATION_PLAYER_WALK_BOOK_MISSILE = 6
 ANIMATION_SPELL_MAGIC_MISSILE = 7
+ANIMATION_PLAYER_TELEPORT_ENTER = 8
+ANIMATION_PLAYER_TELEPORT_EXIT = 9
 
 animation_frames = []
 animation_frame_size = []
@@ -17,7 +19,7 @@ animation_frame_count = []
 animation_frame_duration = []
 animation_loops = []
 
-animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile", "magicmissile"]
+animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile", "magicmissile", "teleportenter", "teleportexit"]
 
 image_map = None
 image_health_full = None
@@ -38,6 +40,8 @@ def load_all():
     load_from_file(ANIMATION_PLAYER_RUN_BOOK_MISSILE, (31, 32), 4, 0.4, True, True)
     load_from_file(ANIMATION_PLAYER_WALK_BOOK_MISSILE, (27, 32), 5, 0.5, True, True)
     load_from_file(ANIMATION_SPELL_MAGIC_MISSILE, (32, 9), 3, 0.3, True, True)
+    load_from_file(ANIMATION_PLAYER_TELEPORT_ENTER, (31, 32), 6, 0.5, False, True)
+    load_from_file(ANIMATION_PLAYER_TELEPORT_EXIT, (28, 32), 6, 0.5, False, True)
 
     image_map = pygame.image.load(image_path + "testmap.png").convert()
     image_health_full = pygame.image.load(image_path + "uifullheart.png").convert_alpha()

@@ -326,6 +326,11 @@ def game():
                     gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_SPELLCAST, mouse_pos))
                     if not connect_as_server:
                         network.client_event_queue.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
+                elif event.button == 3:
+                    mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
+                    gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_TELEPORT, mouse_pos))
+                    if not connect_as_server:
+                        network.client_event_queue.append((True, gamestate.INPUT_TELEPORT, mouse_pos))
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
@@ -384,10 +389,15 @@ def game():
             if player_book_frame is not None:
                 display.blit(player_book_frame, player_coords)
 
-            # player_rect_raw = gamestate.player_rect_get(player_index)
-            # player_rect_raw[0] -= gamestate.player_camera_offset[0]
-            # player_rect_raw[1] -= gamestate.player_camera_offset[1]
-            # pygame.draw.rect(display, color_red, player_rect_raw, 1)
+            teleport_coords = gamestate.player_teleport_render_coordinates_get(player_index)
+            if teleport_coords is not None:
+                player_teleport_frame = gamestate.player_animation_teleport_frame_get(player_index)
+                display.blit(player_teleport_frame, teleport_coords)
+
+            player_rect_raw = gamestate.player_rect_get(player_index)
+            player_rect_raw[0] -= gamestate.player_camera_offset[0]
+            player_rect_raw[1] -= gamestate.player_camera_offset[1]
+            pygame.draw.rect(display, color_red, player_rect_raw, 1)
 
         # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):

@@ -8,6 +8,7 @@ INPUT_DOWN = 1
 INPUT_RIGHT = 2
 INPUT_LEFT = 3
 INPUT_SPELLCAST = 4
+INPUT_TELEPORT = 5
 
 player_input_mouse_position = [0, 0]
 player_input_mouse_sensitivity = 0.15
@@ -28,10 +29,13 @@ player_size_run = [-10, 1, 20, 32]
 player_size_walk = [1, 1, 24, 32]
 PLAYER_SPEED = 3
 PLAYER_WALK_SPEED = 1
+PLAYER_CAMERA_SPEED = 8
+PLAYER_MAX_TELEPORT_DIST = 200
 
 player_camera_offset = [0, 0]
 player_position = []
 player_velocity = []
+player_teleport_dest = []
 
 player_health = []
 player_display_health = []
@@ -70,7 +74,7 @@ def map_load():
 
 def create_player():
     player_input_queue.append([])
-    player_input_state.append([False, False, False, False, False])
+    player_input_state.append([False, False, False, False, False, False])
     player_input_direction.append([0, 0])
 
     new_animations = []
@@ -78,6 +82,7 @@ def create_player():
     new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_RUN))
     new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_WALK))
     new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_CAST_MISSILE))
+    new_animations.append(animations.instance_create(animations.ANIMATION_PLAYER_TELEPORT_ENTER))
 
     player_animations.append(new_animations)
     player_animation_state.append(0)
@@ -86,6 +91,7 @@ def create_player():
 
     player_position.append([128, 400])
     player_velocity.append([0, 0])
+    player_teleport_dest.append(None)
 
     player_health.append(100)
     player_display_health.append(100)
@@ -132,6 +138,27 @@ def player_input_handle(player_index, input_event):
                     update_player_velocity = True
                 else:
                     update_player_velocity = True
+        elif input_event_name == INPUT_TELEPORT:
+            if player_pending_spells[player_index] is None and not player_animation_windup[player_index] and player_teleport_dest[player_index] is None:
+                teleport_target = [mouse_pos[0], mouse_pos[1]]
+                player_rect = player_rect_get(player_index)
+                player_center = [player_rect[0] + (player_rect[2] // 2), player_rect[1] + (player_rect[3] // 2)]
+                if point_distance(player_center, teleport_target) > PLAYER_MAX_TELEPORT_DIST:
+                    dist_vector = [teleport_target[0] - player_center[0], teleport_target[1] - player_center[1]]
+                    new_dist_vector = scale_vector(dist_vector, PLAYER_MAX_TELEPORT_DIST)
+                    teleport_target = [player_center[0] + new_dist_vector[0], player_center[1] + new_dist_vector[1]]
+                player_dest_rect = [teleport_target[0] - (player_rect[2] // 2), teleport_target[1] - (player_rect[3] // 2), player_rect[2], player_rect[3]]
+                for collider in map_colliders:
+                    if collision_check_rectangles(player_dest_rect, collider):
+                        backstep = [player_center[0] - teleport_target[0], player_center[1] - teleport_target[1]]
+                        backstep_magnitude = math.sqrt((backstep[0] ** 2) + (backstep[1] ** 2))
+                        unit_backstep = [backstep[0] / backstep_magnitude, backstep[1] / backstep_magnitude]
+                        while collision_check_rectangles(player_dest_rect, collider):
+                            teleport_target[0] += unit_backstep[0]
+                            teleport_target[1] += unit_backstep[1]
+                            player_dest_rect = [teleport_target[0] - (player_rect[2] // 2), teleport_target[1] - (player_rect[3] // 2), player_rect[2], player_rect[3]]
+                player_teleport_dest[player_index] = [teleport_target[0] - (player_rect[2] // 2), teleport_target[1] - (player_rect[3] // 2)]
+                update_player_velocity = True
         player_input_state[player_index][input_event_name] = True
     else:
         if input_event_name == INPUT_UP:
@@ -198,7 +225,7 @@ def player_spell_cast(player_index, mouse_pos):
 
 
 def player_velocity_update(player_index):
-    if player_animation_windup[player_index]:
+    if player_animation_windup[player_index] or player_teleport_dest[player_index] is not None:
         player_velocity[player_index][0] = 0
         player_velocity[player_index][1] = 0
     else:
@@ -286,19 +313,22 @@ def update(delta):
             player_animation_flipped[player_index] = True
 
         desired_animation_state = 0
-        if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
-            if player_pending_spells[player_index] is None:
-                desired_animation_state = 1
-            else:
-                desired_animation_state = 2
+        if player_teleport_dest[player_index] is not None:
+            desired_animation_state = 4
         else:
-            if player_animation_state[player_index] == 3:
-                if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
-                    desired_animation_state = 0
+            if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
+                if player_pending_spells[player_index] is None:
+                    desired_animation_state = 1
                 else:
+                    desired_animation_state = 2
+            else:
+                if player_animation_state[player_index] == 3:
+                    if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
+                        desired_animation_state = 0
+                    else:
+                        desired_animation_state = 3
+                elif player_animation_windup[player_index] or player_animation_state[player_index] == 3:
                     desired_animation_state = 3
-            elif player_animation_windup[player_index] or player_animation_state[player_index] == 3:
-                desired_animation_state = 3
 
         current_animation_state = player_animation_state[player_index]
         if current_animation_state != desired_animation_state:
@@ -310,6 +340,13 @@ def update(delta):
             if animations.instance_cast_animation_ready(player_animations[player_index][player_animation_state[player_index]]):
                 player_spell_cast(player_index, player_pending_spell_aim[player_index])
                 player_animation_windup[player_index] = False
+                player_velocity_update(player_index)
+
+        if player_teleport_dest[player_index] is not None:
+            if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
+                player_position[player_index][0] = player_teleport_dest[player_index][0]
+                player_position[player_index][1] = player_teleport_dest[player_index][1]
+                player_teleport_dest[player_index] = None
                 player_velocity_update(player_index)
 
         # Player display health sliding
@@ -342,6 +379,8 @@ def update(delta):
                     break
             spell_rect = spells.instance_rect_get(spell_instances[spell_index])
             for player_index in range(0, player_count_get()):
+                if player_teleport_dest[player_index] is not None:
+                    continue
                 player_rect = player_rect_get(player_index)
                 if collision_check_rectangles(spell_rect, player_rect):
                     player_health[player_index] -= spells.instance_damage_get(spell_instances[spell_index])
@@ -357,7 +396,19 @@ def player_camera_position_set(player_index):
     global player_position, player_input_mouse_position, player_input_mouse_sensitivity, player_camera_offset, screen_center
 
     mouse_offset = [(player_input_mouse_position[0] - screen_center[0]) * player_input_mouse_sensitivity, (player_input_mouse_position[1] - screen_center[1]) * player_input_mouse_sensitivity]
-    player_camera_offset = [player_position[player_index][0] - screen_center[0] + mouse_offset[0], player_position[player_index][1] - screen_center[1] + mouse_offset[1]]
+    desired_player_camera_offset = None
+    if player_teleport_dest[player_index] is not None:
+        desired_player_camera_offset = [player_teleport_dest[player_index][0] - screen_center[0] + mouse_offset[0], player_teleport_dest[player_index][1] - screen_center[1] + mouse_offset[1]]
+    else:
+        desired_player_camera_offset = [player_position[player_index][0] - screen_center[0] + mouse_offset[0], player_position[player_index][1] - screen_center[1] + mouse_offset[1]]
+    camera_dist = point_distance(desired_player_camera_offset, player_camera_offset)
+    if camera_dist <= PLAYER_CAMERA_SPEED:
+        player_camera_offset = desired_player_camera_offset
+    else:
+        camera_offset_difference = [desired_player_camera_offset[0] - player_camera_offset[0], desired_player_camera_offset[1] - player_camera_offset[1]]
+        camera_offset_step = scale_vector(camera_offset_difference, PLAYER_CAMERA_SPEED)
+        player_camera_offset[0] += camera_offset_step[0]
+        player_camera_offset[1] += camera_offset_step[1]
 
 
 def state_data_get():
@@ -483,11 +534,20 @@ def player_render_coordinates_get(player_index):
             player_rect[0] -= 4
         elif animation_state == 3:
             player_rect[0] -= 5
+        elif animation_state == 4:
+            player_rect[0] -= 2
 
     player_rect[0] -= player_camera_offset[0]
     player_rect[1] -= player_camera_offset[1]
 
     return [int(player_rect[0]), int(player_rect[1])]
+
+
+def player_teleport_render_coordinates_get(player_index):
+    if player_teleport_dest[player_index] is None:
+        return None
+    else:
+        return [player_teleport_dest[player_index][0] - 10 - player_camera_offset[0], player_teleport_dest[player_index][1] - 7 - player_camera_offset[1]]
 
 
 def player_spell_charge_percentage_get(player_index):
@@ -529,8 +589,20 @@ def player_animation_frame_get(player_index):
     return animations.instance_get_frame_image(player_animations[player_index][player_animation_state[player_index]], player_animation_flipped[player_index])
 
 
+def player_animation_teleport_frame_get(player_index):
+    if player_animation_state[player_index] != 4:
+        return None
+    else:
+        animation_instance = player_animations[player_index][player_animation_state[player_index]]
+        exit_instance = []
+        for i in range(0, len(animation_instance)):
+            exit_instance.append(animation_instance[i])
+        exit_instance[0] += 1
+        return animations.instance_get_frame_image(exit_instance, player_animation_flipped[player_index])
+
+
 def player_animation_frame_book_get(player_index):
-    if player_animation_state[player_index] == 3:
+    if player_animation_state[player_index] == 3 or player_animation_state[player_index] == 4:
         return None
     animation_instance = player_animations[player_index][player_animation_state[player_index]]
     book_instance = []
@@ -566,6 +638,12 @@ def vector_angle_get(vector):
         if vector[1] < 0:
             angle += 180
         return angle
+
+
+def point_distance(first_point, second_point):
+    x_dist = second_point[0] - first_point[0]
+    y_dist = second_point[1] - first_point[1]
+    return math.sqrt((x_dist ** 2) + (y_dist ** 2))
 
 
 def collision_check_rectangles(rect_first, rect_second):
