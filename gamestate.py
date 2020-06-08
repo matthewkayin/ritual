@@ -46,7 +46,6 @@ player_equipped_spells = []
 player_selected_spell = []
 player_spell_cooldown_timers = []
 spell_instances = []
-spell_animation_instances = []
 
 map_colliders = []
 
@@ -219,7 +218,6 @@ def player_spell_cast(player_index, mouse_pos):
             player_pending_spells[player_index] = None
             return
     spell_instances.append(spell_instance)
-    spell_animation_instances.append(animations.instance_create(spells.spell_animation_name[spell_instance[0]]))
     player_pending_spells[player_index] = None
     player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] = 0
 
@@ -386,10 +384,8 @@ def update(delta):
                     player_health[player_index] -= spells.instance_damage_get(spell_instances[spell_index])
                     spell_instances[spell_index][0] = spells.SPELL_DELETE_ME
 
-        animations.instance_update(spell_animation_instances[spell_index], delta)
     for index in spell_indexes_deleted_this_frame:
         del spell_instances[index]
-        del spell_animation_instances[index]
 
 
 def player_camera_position_set(player_index):
@@ -568,19 +564,16 @@ def player_health_percentage_get(player_index):
     return max(0, player_display_health[player_index]) / 100
 
 
-def spell_render_image_get(spell_index):
+def spell_render_coords_get(spell_index):
     spell_rect = spells.instance_rect_get(spell_instances[spell_index])
     spell_velocity = spells.instance_velocity_get(spell_instances[spell_index])
     angle = math.degrees(math.atan2(spell_velocity[1], spell_velocity[0])) * -1
-    image, offset = animations.instance_get_rotated_frame_image(spell_animation_instances[spell_index], angle)
 
     spell_rect = spells.instance_rect_get(spell_instances[spell_index])
     spell_rect[0] -= player_camera_offset[0]
     spell_rect[1] -= player_camera_offset[1]
-    spell_rect[0] += offset[0]
-    spell_rect[1] += offset[1]
 
-    return image, spell_rect
+    return spell_rect, angle
 
 
 def spell_render_coordinates_get(spell_index):

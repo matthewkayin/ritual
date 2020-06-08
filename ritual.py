@@ -404,7 +404,10 @@ def game():
             spell_rect[0] -= gamestate.player_camera_offset[0]
             spell_rect[1] -= gamestate.player_camera_offset[1]
             pygame.draw.rect(display, color_red, spell_rect, 1)
-            spell_image, spell_coords = gamestate.spell_render_image_get(spell_index)
+            spell_coords, spell_angle = gamestate.spell_render_coords_get(spell_index)
+            spell_image, offset_coords = animations.get_rotated_image(animations.image_magic_missile, spell_angle)
+            spell_coords[0] += offset_coords[0]
+            spell_coords[1] += offset_coords[1]
             display.blit(spell_image, spell_coords)
 
         # Draw UI
