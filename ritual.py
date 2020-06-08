@@ -61,7 +61,7 @@ player_teams = []
 
 
 def menu():
-    global connect_as_server, local_player_index
+    global connect_as_server, local_player_index, player_usernames
 
     running = True
     return_gamestate = GAMESTATE_EXIT
@@ -275,13 +275,13 @@ def game():
     running = True
     return_gamestate = GAMESTATE_EXIT
 
-    local_player_index = 0
-
     animations.load_all()
     spells.spell_define_all()
     gamestate.screen_dimensions_set((SCREEN_WIDTH, SCREEN_HEIGHT))
     gamestate.map_load()
-    gamestate.create_player()
+
+    for username in player_usernames:
+        gamestate.create_player()
 
     before_time = pygame.time.get_ticks()
     ping_before_time = before_time
@@ -346,9 +346,7 @@ def game():
             network.server_read()
             while len(network.server_event_queue) != 0:
                 server_event = network.server_event_queue.pop(0)
-                if server_event[0] == network.SERVER_EVENT_NEW_PLAYER:
-                    gamestate.create_player()
-                elif server_event[0] == network.SERVER_EVENT_PLAYER_INPUT:
+                if server_event[0] == network.SERVER_EVENT_PLAYER_INPUT:
                     gamestate.player_input_queue_append(server_event[1], server_event[2])
         else:
             server_data = network.client_read()

@@ -423,6 +423,9 @@ def state_data_get():
         player_data_entry.append(round(player_velocity[player_index][0], 2))
         player_data_entry.append(round(player_velocity[player_index][1], 2))
         player_data_entry.append(int(player_health[player_index]))
+        if player_teleport_dest[player_index] is not None:
+            player_data_entry.append(int(player_teleport_dest[player_index][0]))
+            player_data_entry.append(int(player_teleport_dest[player_index][1]))
 
         player_data.append(player_data_entry)
     state_data.append(player_data)
@@ -458,7 +461,7 @@ def state_data_set(state_data):
     global spell_instances, spell_animation_instances
 
     player_data = state_data[0]
-    for player_index in range(0, len(state_data)):
+    for player_index in range(0, len(player_data)):
         if player_index == player_count_get():
             create_player()
         player_position[player_index][0] = int(player_data[player_index][0])
@@ -466,11 +469,15 @@ def state_data_set(state_data):
         player_velocity[player_index][0] = float(player_data[player_index][2])
         player_velocity[player_index][1] = float(player_data[player_index][3])
         player_health[player_index] = int(player_data[player_index][4])
+        if len(player_data[player_index]) == 7:
+            player_teleport_dest[player_index] = [int(player_data[player_index][5]), int(player_data[player_index][6])]
+        else:
+            player_teleport_dest[player_index] = None
 
     spell_data = state_data[1]
     spell_instances = []
     spell_animation_instances = []
-    for player_index in range(0, len(state_data)):
+    for player_index in range(0, len(player_data)):
         player_pending_spells[player_index] = None
     # This if statement happens when there is no spell data, we set the array to empty to skip this whole section
     if spell_data[0] == [""]:

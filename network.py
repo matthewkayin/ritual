@@ -75,7 +75,6 @@ def server_read():
                     server_client_userteams[address] = False
                     server_client_read_buffer[address] = ""
                     server_client_ping[address] = True
-                    server_event_queue.append([SERVER_EVENT_NEW_PLAYER])
 
     # Read from player buffers
     current_player_index = 1
