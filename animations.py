@@ -9,8 +9,9 @@ ANIMATION_PLAYER_CAST_MISSILE = 3
 ANIMATION_PLAYER_IDLE_BOOK_MISSILE = 4
 ANIMATION_PLAYER_RUN_BOOK_MISSILE = 5
 ANIMATION_PLAYER_WALK_BOOK_MISSILE = 6
-ANIMATION_PLAYER_TELEPORT_ENTER = 7
-ANIMATION_PLAYER_TELEPORT_EXIT = 8
+ANIMATION_PLAYER_IDLE_CHARGE_BOOK_MISSILE = 7
+ANIMATION_PLAYER_TELEPORT_ENTER = 8
+ANIMATION_PLAYER_TELEPORT_EXIT = 9
 
 animation_frames = []
 animation_frame_size = []
@@ -18,7 +19,7 @@ animation_frame_count = []
 animation_frame_duration = []
 animation_loops = []
 
-animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile", "teleportenter", "teleportexit"]
+animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile", "idlebookmagicmissilecharge", "teleportenter", "teleportexit"]
 
 image_map = None
 image_health_full = None
@@ -27,10 +28,11 @@ image_toolbar = None
 image_chargebar_full = None
 image_chargebar_empty = None
 image_magic_missile = None
+image_hurt_wizard = None
 
 
 def load_all():
-    global image_map, image_health_full, image_health_empty, image_toolbar, image_chargebar_full, image_chargebar_empty, image_magic_missile
+    global image_map, image_health_full, image_health_empty, image_toolbar, image_chargebar_full, image_chargebar_empty, image_magic_missile, image_hurt_wizard
 
     load_from_file(ANIMATION_PLAYER_IDLE, (22, 32), 14, 1.5, True, True)
     load_from_file(ANIMATION_PLAYER_RUN, (31, 32), 4, 0.4, True, True)
@@ -39,6 +41,7 @@ def load_all():
     load_from_file(ANIMATION_PLAYER_IDLE_BOOK_MISSILE, (22, 32), 14, 1.5, True, True)
     load_from_file(ANIMATION_PLAYER_RUN_BOOK_MISSILE, (31, 32), 4, 0.4, True, True)
     load_from_file(ANIMATION_PLAYER_WALK_BOOK_MISSILE, (27, 32), 5, 0.5, True, True)
+    load_from_file(ANIMATION_PLAYER_IDLE_CHARGE_BOOK_MISSILE, (22, 32), 14, 1.5, True, True)
     load_from_file(ANIMATION_PLAYER_TELEPORT_ENTER, (31, 32), 6, 0.5, False, True)
     load_from_file(ANIMATION_PLAYER_TELEPORT_EXIT, (28, 32), 6, 0.5, False, True)
 
@@ -49,6 +52,7 @@ def load_all():
     image_chargebar_full = pygame.image.load(image_path + "uichargebarfull.png").convert_alpha()
     image_chargebar_empty = pygame.image.load(image_path + "uichargebar.png").convert_alpha()
     image_magic_missile = pygame.image.load(image_path + "magicmissile.png").convert_alpha()
+    image_hurt_wizard = pygame.image.load(image_path + "hurtwizard.png").convert_alpha()
 
 
 def load_from_file(animation_name, frame_size, frame_count, duration, looping, has_alpha):
@@ -122,6 +126,10 @@ def instance_get_frame_image(animation_instance, is_flipped):
     global animation_frames
 
     return pygame.transform.flip(animation_frames[animation_instance[0]][animation_instance[2]], is_flipped, False)
+
+
+def get_flipped_image(image, is_flipped):
+    return pygame.transform.flip(image, is_flipped, False)
 
 
 def instance_get_rotated_frame_image(animation_instance, angle, origin_pos=None):

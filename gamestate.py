@@ -31,6 +31,8 @@ PLAYER_SPEED = 3
 PLAYER_WALK_SPEED = 1
 PLAYER_CAMERA_SPEED = 8
 PLAYER_MAX_TELEPORT_DIST = 200
+PLAYER_HURT_DURATION = 7
+PLAYER_HURT_SPEED = 15
 
 player_camera_offset = [0, 0]
 player_position = []
@@ -39,6 +41,7 @@ player_teleport_dest = []
 
 player_health = []
 player_display_health = []
+player_hurt_timer = []
 
 player_pending_spells = []
 player_pending_spell_aim = []
@@ -94,6 +97,7 @@ def create_player():
 
     player_health.append(100)
     player_display_health.append(100)
+    player_hurt_timer.append(0)
 
     player_pending_spells.append(None)
     player_pending_spell_aim.append([0, 0])
@@ -223,6 +227,8 @@ def player_spell_cast(player_index, mouse_pos):
 
 
 def player_velocity_update(player_index):
+    if player_hurt_timer[player_index] != 0:
+        return
     if player_animation_windup[player_index] or player_teleport_dest[player_index] is not None:
         player_velocity[player_index][0] = 0
         player_velocity[player_index][1] = 0
@@ -292,6 +298,10 @@ def update(delta):
                     player_position[player_index][1] -= player_y_step
                     player_rect[1] -= player_x_step
 
+                if player_hurt_timer[player_index] != 0:
+                    player_hurt_timer[player_index] = 0
+                    player_velocity[player_index] = [0, 0]
+
         # Update player pending spell
         if player_pending_spells[player_index] is not None:
             spells.instance_update(player_pending_spells[player_index], delta, False)
@@ -310,8 +320,16 @@ def update(delta):
         elif not player_animation_flipped[player_index] and player_velocity[player_index][0] < 0:
             player_animation_flipped[player_index] = True
 
+        if player_hurt_timer[player_index] != 0:
+            player_hurt_timer[player_index] -= delta
+            if player_hurt_timer[player_index] <= 0:
+                player_hurt_timer[player_index] = 0
+                player_velocity[player_index] = [0, 0]
+
         desired_animation_state = 0
-        if player_teleport_dest[player_index] is not None:
+        if player_hurt_timer[player_index] > 0:
+            desired_animation_state = -1
+        elif player_teleport_dest[player_index] is not None:
             desired_animation_state = 4
         else:
             if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
@@ -328,11 +346,12 @@ def update(delta):
                 elif player_animation_windup[player_index] or player_animation_state[player_index] == 3:
                     desired_animation_state = 3
 
-        current_animation_state = player_animation_state[player_index]
-        if current_animation_state != desired_animation_state:
-            animations.instance_reset(player_animations[player_index][current_animation_state])
-            player_animation_state[player_index] = desired_animation_state
-        animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
+        if desired_animation_state != -1:
+            current_animation_state = player_animation_state[player_index]
+            if current_animation_state != desired_animation_state:
+                animations.instance_reset(player_animations[player_index][current_animation_state])
+                player_animation_state[player_index] = desired_animation_state
+            animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
 
         if player_animation_windup[player_index]:
             if animations.instance_cast_animation_ready(player_animations[player_index][player_animation_state[player_index]]):
@@ -382,6 +401,11 @@ def update(delta):
                 player_rect = player_rect_get(player_index)
                 if collision_check_rectangles(spell_rect, player_rect):
                     player_health[player_index] -= spells.instance_damage_get(spell_instances[spell_index])
+                    player_hurt_timer[player_index] = PLAYER_HURT_DURATION
+                    player_velocity[player_index] = scale_vector(spells.instance_velocity_get(spell_instances[spell_index]), PLAYER_HURT_SPEED)
+                    player_pending_spells[player_index] = None
+                    animations.instance_reset(player_animations[player_index][player_animation_state[player_index]])
+                    player_animation_state[player_index] = 0
                     spell_instances[spell_index][0] = spells.SPELL_DELETE_ME
 
     for index in spell_indexes_deleted_this_frame:
@@ -419,6 +443,7 @@ def state_data_get():
         player_data_entry.append(round(player_velocity[player_index][0], 2))
         player_data_entry.append(round(player_velocity[player_index][1], 2))
         player_data_entry.append(int(player_health[player_index]))
+        player_data_entry.append(int(player_hurt_timer[player_index]))
         if player_teleport_dest[player_index] is not None:
             player_data_entry.append(int(player_teleport_dest[player_index][0]))
             player_data_entry.append(int(player_teleport_dest[player_index][1]))
@@ -465,8 +490,9 @@ def state_data_set(state_data):
         player_velocity[player_index][0] = float(player_data[player_index][2])
         player_velocity[player_index][1] = float(player_data[player_index][3])
         player_health[player_index] = int(player_data[player_index][4])
-        if len(player_data[player_index]) == 7:
-            player_teleport_dest[player_index] = [int(player_data[player_index][5]), int(player_data[player_index][6])]
+        player_hurt_timer[player_index] = int(player_data[player_index][5])
+        if len(player_data[player_index]) == 8:
+            player_teleport_dest[player_index] = [int(player_data[player_index][6]), int(player_data[player_index][7])]
         else:
             player_teleport_dest[player_index] = None
 
@@ -586,6 +612,8 @@ def spell_render_coordinates_get(spell_index):
 
 
 def player_animation_frame_get(player_index):
+    if player_hurt_timer[player_index] != 0:
+        return animations.get_flipped_image(animations.image_hurt_wizard, not player_animation_flipped[player_index])
     return animations.instance_get_frame_image(player_animations[player_index][player_animation_state[player_index]], player_animation_flipped[player_index])
 
 
@@ -609,6 +637,8 @@ def player_animation_frame_book_get(player_index):
     for i in range(0, len(animation_instance)):
         book_instance.append(animation_instance[i])
     book_instance[0] += 4
+    if player_animation_state[player_index] == 0 and player_pending_spells[player_index] is not None:
+        book_instance[0] += 3
     return animations.instance_get_frame_image(book_instance, player_animation_flipped[player_index])
 
 
