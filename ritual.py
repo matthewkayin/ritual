@@ -45,9 +45,11 @@ color_black = (0, 0, 0)
 color_white = (255, 255, 255)
 color_red = (255, 0, 0)
 color_yellow = (255, 255, 0)
+color_green = (0, 255, 0)
 
 # Fonts
 font_small = pygame.font.SysFont("Serif", 11)
+font_big = pygame.font.SysFont("Serif", 36)
 
 # Gamestates
 GAMESTATE_EXIT = -1
@@ -275,13 +277,22 @@ def game():
     running = True
     return_gamestate = GAMESTATE_EXIT
 
+    display_render_loadscreen("Loading animations...")
     animations.load_all()
+    display_render_loadscreen("Loading spells...")
     spells.spell_define_all()
     gamestate.screen_dimensions_set((SCREEN_WIDTH, SCREEN_HEIGHT))
-    gamestate.map_load()
+    display_render_loadscreen("Generating map...")
+    gamestate.map_load(animations.image_map, animations.image_map_alpha)
 
+    display_render_loadscreen("Initializing players...")
     for username in player_usernames:
         gamestate.create_player()
+    gamestate.player_camera_position_set(local_player_index)
+
+    text_death = font_big.render("You Died", False, color_red)
+    text_victory = font_big.render("You Won!", False, color_green)
+    game_is_over = False
 
     before_time = pygame.time.get_ticks()
     ping_before_time = before_time
@@ -363,6 +374,11 @@ def game():
         before_time = pygame.time.get_ticks()
         gamestate.update(delta)
         gamestate.player_camera_position_set(local_player_index)
+        gamestate.gameover_timer_update(local_player_index, delta)
+
+        if game_is_over and gamestate.gameover_state_get(local_player_index) == 0: 
+            gamestate.player_camera_position_set(local_player_index)
+            game_is_over = False
 
         # Write network
         if connect_as_server:
@@ -380,6 +396,8 @@ def game():
 
         # Draw players
         for player_index in range(0, gamestate.player_count_get()):
+            if gamestate.player_health[player_index] <= 0:
+                continue
             player_coords = gamestate.player_render_coordinates_get(player_index)
             player_frame = gamestate.player_animation_frame_get(player_index)
             player_book_frame = gamestate.player_animation_frame_book_get(player_index)
@@ -400,10 +418,6 @@ def game():
         # Draw spells
         for spell_index in range(0, gamestate.spell_count_get()):
             # spell_coords = gamestate.player_spell_render_coordinates_get(spell_index)
-            spell_rect = spells.instance_rect_get(gamestate.spell_instances[spell_index])
-            spell_rect[0] -= gamestate.player_camera_offset[0]
-            spell_rect[1] -= gamestate.player_camera_offset[1]
-            pygame.draw.rect(display, color_red, spell_rect, 1)
             spell_coords, spell_angle = gamestate.spell_render_coords_get(spell_index)
             spell_image, offset_coords = animations.get_rotated_image(animations.image_magic_missile, spell_angle)
             spell_coords[0] += offset_coords[0]
@@ -434,6 +448,24 @@ def game():
             full_width = int(charge_width * player_charge_percent)
             display.blit(animations.image_chargebar_full.subsurface(0, 0, full_width, charge_height), (0, 0))
             display.blit(animations.image_chargebar_empty.subsurface(full_width, 0, charge_width - full_width, charge_height), (full_width, 0))
+        player_cooldown_timers = gamestate.player_cooldown_percents_get(local_player_index)
+        if player_cooldown_timers[0] is None:
+            pygame.draw.rect(display, color_yellow, (38, 7, 20, 20), False)
+        else:
+            pygame.draw.rect(display, color_red, (38, 7 + int(20 * (1 - player_cooldown_timers[0])), 20, int(20 * player_cooldown_timers[0])), False)
+        player_teleport_cooldown = gamestate.player_teleport_cooldown_percent_get(local_player_index)
+        if player_teleport_cooldown is None:
+            pygame.draw.rect(display, color_yellow, (61, 7, 20, 20), False)
+        else:
+            pygame.draw.rect(display, color_red, (61, 7 + int(20 * (1 - player_teleport_cooldown)), 20, int(20 * player_teleport_cooldown)), False)
+
+        # Draw gameover
+        if gamestate.gameover_state_get(local_player_index) == -1:
+            display.blit(text_death, ((DISPLAY_WIDTH // 2) - (text_death.get_width() // 2), (DISPLAY_HEIGHT // 2) - (text_death.get_height() // 2)))
+            game_is_over = True
+        elif gamestate.gameover_state_get(local_player_index) == 1:
+            display.blit(text_victory, ((DISPLAY_WIDTH // 2) - (text_victory.get_width() // 2), (DISPLAY_HEIGHT // 2) - (text_victory.get_height() // 2)))
+            game_is_over = True
 
         if show_fps:
             render_fps()
@@ -456,6 +488,13 @@ def display_clear():
 def display_flip():
     pygame.transform.scale(display, (SCREEN_WIDTH, SCREEN_HEIGHT), screen)
     pygame.display.flip()
+
+
+def display_render_loadscreen(loadscreen_text):
+    display_clear()
+    loadscreen_surface = font_small.render(loadscreen_text, False, color_white)
+    display.blit(loadscreen_surface, ((DISPLAY_WIDTH // 2) - (loadscreen_surface.get_width() // 2), (DISPLAY_HEIGHT // 2) - (loadscreen_surface.get_height())))
+    display_flip()
 
 
 def render_fps():

@@ -1,6 +1,3 @@
-import animations
-
-
 SPELL_DELETE_ME = -1
 SPELL_MAGIC_MISSILE = 0
 
@@ -16,7 +13,7 @@ spell_size = []
 spell_speed = []
 spell_damage = []
 
-spell_magic_missile_extra_speed = 3
+spell_magic_missile_extra_speed = 7
 
 
 def spell_define(name, charge_type, charge_time, cooldown_time, time_to_live, size, speed, damage):
@@ -30,7 +27,7 @@ def spell_define(name, charge_type, charge_time, cooldown_time, time_to_live, si
 
 
 def spell_define_all():
-    spell_define(SPELL_MAGIC_MISSILE, CHARGE_PARTIAL_CAST, 1.0, 3.0, 3.0, (10, 10), 5, 30)
+    spell_define(SPELL_MAGIC_MISSILE, CHARGE_PARTIAL_CAST, 1.0, 1.0, 1.5, (10, 10), 3, 40)
 
 
 def spell_charge_type_get(spell_name):

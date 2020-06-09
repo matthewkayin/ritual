@@ -33,11 +33,13 @@ PLAYER_CAMERA_SPEED = 8
 PLAYER_MAX_TELEPORT_DIST = 200
 PLAYER_HURT_DURATION = 7
 PLAYER_HURT_SPEED = 15
+PLAYER_TELEPORT_COOLDOWN = 5 * 60
 
 player_camera_offset = [0, 0]
 player_position = []
 player_velocity = []
 player_teleport_dest = []
+player_teleport_cooldown_timer = []
 
 player_health = []
 player_display_health = []
@@ -50,7 +52,12 @@ player_selected_spell = []
 player_spell_cooldown_timers = []
 spell_instances = []
 
+map_background_image = None
 map_colliders = []
+map_spawn_points = []
+
+gameover_reset_timer = 0
+gameover_message_duration = 60 * 3
 
 
 def screen_dimensions_set(screen_size):
@@ -60,18 +67,37 @@ def screen_dimensions_set(screen_size):
     screen_center = (screen_dimensions[0] // 2, screen_dimensions[1] // 2)
 
 
-def map_load():
-    global map_colliders
+def map_load(map_image, map_alpha):
+    global map_colliders, map_background_image
+
+    map_background_image = map_image
 
     # Walls
-    map_colliders.append((0, 0, 1280, 64))
-    map_colliders.append((0, 64, 64, 592))
-    map_colliders.append((0, 656, 1280, 64))
-    map_colliders.append((1216, 64, 64, 592))
-
-    # Bookshelves
-    map_colliders.append((128, 128, 400, 70))
-    map_colliders.append((128, 262, 400, 70))
+    map_colliders = []
+    for x in range(0, map_alpha.get_width()):
+        for y in range(0, map_alpha.get_height()):
+            if map_alpha.get_at((x, y)) == (0, 0, 0):
+                new_collider_x = x
+                new_collider_y = y
+                # first, cycle points until we get width
+                current_x = x 
+                current_y = y
+                while current_x < map_alpha.get_width() and map_alpha.get_at((current_x, current_y)) == (0, 0, 0) and True not in [point_in_rect((current_x, current_y), collider) for collider in map_colliders]:
+                    current_x += 1
+                new_collider_width = current_x - x
+                if new_collider_width != 0:
+                    current_x = new_collider_x
+                    current_y += 1
+                    while current_y < map_alpha.get_height() and map_alpha.get_at((current_x, current_y)) == (0, 0, 0) and True not in [point_in_rect((current_x, current_y), collider) for collider in map_colliders]:
+                        current_x += 1
+                        if current_x == new_collider_x + new_collider_width - 1:
+                            current_x = new_collider_x
+                            current_y += 1
+                    new_collider_height = current_y - new_collider_y
+                    map_colliders.append([new_collider_x, new_collider_y, new_collider_width, new_collider_height])
+            elif map_alpha.get_at((x, y)) == (255, 0, 0):
+                if map_alpha.get_at((x - 1, y)) != (255, 0, 0) and map_alpha.get_at((x, y - 1)) != (255, 0, 0):
+                    map_spawn_points.append([x, y])
 
 
 def create_player():
@@ -91,9 +117,13 @@ def create_player():
     player_animation_flipped.append(False)
     player_animation_windup.append(False)
 
-    player_position.append([128, 400])
+    new_player_index = len(player_input_queue) - 1
+    player_position.append([0, 0])
+    player_position[new_player_index][0] = map_spawn_points[new_player_index][0]
+    player_position[new_player_index][1] = map_spawn_points[new_player_index][1]
     player_velocity.append([0, 0])
     player_teleport_dest.append(None)
+    player_teleport_cooldown_timer.append(0)
 
     player_health.append(100)
     player_display_health.append(100)
@@ -104,6 +134,25 @@ def create_player():
     player_equipped_spells.append([0, -1, -1, -1])
     player_selected_spell.append(0)
     player_spell_cooldown_timers.append([-1, -1, -1, -1])
+
+
+def reset_players():
+    for player_index in range(0, len(player_input_queue)):
+        animations.instance_reset(player_animations[player_index][player_animation_state[player_index]])
+        player_animation_state[player_index] = 0
+        player_animation_windup[player_index] = False
+
+        player_position[player_index][0] = map_spawn_points[player_index][0]
+        player_position[player_index][1] = map_spawn_points[player_index][1]
+        player_velocity[player_index] = [0, 0]
+        player_teleport_dest[player_index] = None
+        player_teleport_cooldown_timer[player_index] = 0
+
+        player_health[player_index] = 100
+        player_display_health[player_index] = 100
+
+        player_pending_spells[player_index] = None
+        player_spell_cooldown_timers[player_index] = [-1, -1, -1, -1]
 
 
 def player_input_queue_append(player_index, input_event):
@@ -142,7 +191,7 @@ def player_input_handle(player_index, input_event):
                 else:
                     update_player_velocity = True
         elif input_event_name == INPUT_TELEPORT:
-            if player_pending_spells[player_index] is None and not player_animation_windup[player_index] and player_teleport_dest[player_index] is None:
+            if player_pending_spells[player_index] is None and not player_animation_windup[player_index] and player_teleport_dest[player_index] is None and player_teleport_cooldown_timer[player_index] == 0:
                 teleport_target = [mouse_pos[0], mouse_pos[1]]
                 player_rect = player_rect_get(player_index)
                 player_center = [player_rect[0] + (player_rect[2] // 2), player_rect[1] + (player_rect[3] // 2)]
@@ -263,6 +312,8 @@ def player_input_queue_pump_events(player_index=-1):
 
 def update(delta):
     for player_index in range(0, player_count_get()):
+        if player_health[player_index] <= 0:
+            continue
         player_input_queue_pump_events()
 
         # Update player position
@@ -310,9 +361,15 @@ def update(delta):
         for i in range(0, 4):
             if player_spell_cooldown_timers[player_index][i] != -1:
                 player_spell_cooldown_timers[player_index][i] += delta
-                spell_name = player_equipped_spells[player_index][player_selected_spell[player_index]]
+                spell_name = player_equipped_spells[player_index][i]
                 if player_spell_cooldown_timers[player_index][i] >= spells.spell_cooldown_time[spell_name]:
                     player_spell_cooldown_timers[player_index][i] = -1
+
+        # Update teleport cooldown timer
+        if player_teleport_cooldown_timer[player_index] != 0:
+            player_teleport_cooldown_timer[player_index] -= delta
+            if player_teleport_cooldown_timer[player_index] < 0:
+                player_teleport_cooldown_timer[player_index] = 0
 
         # Update player animations
         if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
@@ -364,6 +421,7 @@ def update(delta):
                 player_position[player_index][0] = player_teleport_dest[player_index][0]
                 player_position[player_index][1] = player_teleport_dest[player_index][1]
                 player_teleport_dest[player_index] = None
+                player_teleport_cooldown_timer[player_index] = PLAYER_TELEPORT_COOLDOWN
                 player_velocity_update(player_index)
 
         # Player display health sliding
@@ -431,6 +489,21 @@ def player_camera_position_set(player_index):
         player_camera_offset[1] += camera_offset_step[1]
 
 
+def player_camera_initial_position_set(player_index):
+    player_camera_offset[0] = player_position[player_index][0] - screen_center[0]
+    player_camera_offset[1] = player_position[player_index][1] - screen_center[1]
+
+
+def gameover_timer_update(player_index, delta):
+    global gameover_reset_timer
+
+    if player_index == 0 and len([health for health in player_health if health > 0]) <= 1 and not len(player_health) == 1:
+        gameover_reset_timer += delta
+        if gameover_reset_timer >= gameover_message_duration:
+            gameover_reset_timer = 0
+            reset_players()
+
+
 def state_data_get():
     state_data = []
 
@@ -447,6 +520,8 @@ def state_data_get():
         if player_teleport_dest[player_index] is not None:
             player_data_entry.append(int(player_teleport_dest[player_index][0]))
             player_data_entry.append(int(player_teleport_dest[player_index][1]))
+        else:
+            player_data_entry.append(int(player_teleport_cooldown_timer[player_index]))
 
         player_data.append(player_data_entry)
     state_data.append(player_data)
@@ -479,7 +554,7 @@ def state_data_get():
 
 
 def state_data_set(state_data):
-    global spell_instances, spell_animation_instances
+    global spell_instances 
 
     player_data = state_data[0]
     for player_index in range(0, len(player_data)):
@@ -495,10 +570,10 @@ def state_data_set(state_data):
             player_teleport_dest[player_index] = [int(player_data[player_index][6]), int(player_data[player_index][7])]
         else:
             player_teleport_dest[player_index] = None
+            player_teleport_cooldown_timer[player_index] = int(player_data[player_index][6])
 
     spell_data = state_data[1]
     spell_instances = []
-    spell_animation_instances = []
     for player_index in range(0, len(player_data)):
         player_pending_spells[player_index] = None
     # This if statement happens when there is no spell data, we set the array to empty to skip this whole section
@@ -520,7 +595,6 @@ def state_data_set(state_data):
             spell_values.append(float(spell_data[spell_index][4]))
             spell_values.append(float(spell_data[spell_index][5]))
             spells.instance_values_set(spell_instances[instance_index], spell_values)
-            spell_animation_instances.append(animations.instance_create_with_timer(spells.spell_animation_name[spell_instances[instance_index][0]], spell_instances[instance_index][1]))
             instance_index += 1
 
     for player_index in range(0, len(state_data)):
@@ -590,6 +664,24 @@ def player_health_percentage_get(player_index):
     return max(0, player_display_health[player_index]) / 100
 
 
+def player_cooldown_percents_get(player_index):
+    percents = []
+    for i in range(0, len(player_spell_cooldown_timers[player_index])):
+        if player_spell_cooldown_timers[player_index][i] == -1:
+            percents.append(None)
+        else:
+            spell_name = player_equipped_spells[player_index][i]
+            percents.append(player_spell_cooldown_timers[player_index][i] / spells.spell_cooldown_time[spell_name])
+    return percents
+
+
+def player_teleport_cooldown_percent_get(player_index):
+    if player_teleport_cooldown_timer[player_index] == 0:
+        return None
+    else:
+        return 1 - (player_teleport_cooldown_timer[player_index] / PLAYER_TELEPORT_COOLDOWN)
+
+
 def spell_render_coords_get(spell_index):
     spell_rect = spells.instance_rect_get(spell_instances[spell_index])
     spell_velocity = spells.instance_velocity_get(spell_instances[spell_index])
@@ -642,6 +734,16 @@ def player_animation_frame_book_get(player_index):
     return animations.instance_get_frame_image(book_instance, player_animation_flipped[player_index])
 
 
+def gameover_state_get(player_index):
+    if len(player_health) == 1:
+        return 0
+    if player_health[player_index] <= 0:
+        return -1
+    if sum([int(health > 0) for health in player_health]) == 1:
+        return 1
+    return 0
+
+
 def scale_vector(old_vector, new_magnitude):
     old_magnitude = math.sqrt((old_vector[0] ** 2) + (old_vector[1] ** 2))
     if old_magnitude == 0:
@@ -674,6 +776,10 @@ def point_distance(first_point, second_point):
     x_dist = second_point[0] - first_point[0]
     y_dist = second_point[1] - first_point[1]
     return math.sqrt((x_dist ** 2) + (y_dist ** 2))
+
+
+def point_in_rect(point, rect):
+    return point[0] >= rect[0] and point[0] <= rect[0] + rect[2] and point[1] >= rect[1] and point[1] <= rect[1] + rect[3]
 
 
 def collision_check_rectangles(rect_first, rect_second):

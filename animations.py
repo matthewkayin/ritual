@@ -22,6 +22,7 @@ animation_loops = []
 animation_paths = ["idlewizard", "runwizard", "walkwizard", "castmagicmissile", "idlebookmagicmissile", "runbookmagicmissile", "walkbookmagicmissile", "idlebookmagicmissilecharge", "teleportenter", "teleportexit"]
 
 image_map = None
+image_map_alpha = None
 image_health_full = None
 image_health_empty = None
 image_toolbar = None
@@ -32,7 +33,7 @@ image_hurt_wizard = None
 
 
 def load_all():
-    global image_map, image_health_full, image_health_empty, image_toolbar, image_chargebar_full, image_chargebar_empty, image_magic_missile, image_hurt_wizard
+    global image_map, image_map_alpha, image_health_full, image_health_empty, image_toolbar, image_chargebar_full, image_chargebar_empty, image_magic_missile, image_hurt_wizard
 
     load_from_file(ANIMATION_PLAYER_IDLE, (22, 32), 14, 1.5, True, True)
     load_from_file(ANIMATION_PLAYER_RUN, (31, 32), 4, 0.4, True, True)
@@ -46,6 +47,7 @@ def load_all():
     load_from_file(ANIMATION_PLAYER_TELEPORT_EXIT, (28, 32), 6, 0.5, False, True)
 
     image_map = pygame.image.load(image_path + "testmap.png").convert()
+    image_map_alpha = pygame.image.load(image_path + "testmap.png").convert()
     image_health_full = pygame.image.load(image_path + "uifullheart.png").convert_alpha()
     image_health_empty = pygame.image.load(image_path + "uiemptyheart.png").convert_alpha()
     image_toolbar = pygame.image.load(image_path + "uitoolbar.png").convert_alpha()
