@@ -53,6 +53,7 @@ player_spell_cooldown_timers = []
 spell_instances = []
 
 map_background_image = None
+map_bounds = []
 map_colliders = []
 map_spawn_points = []
 
@@ -68,9 +69,10 @@ def screen_dimensions_set(screen_size):
 
 
 def map_load(map_image, map_alpha):
-    global map_colliders, map_background_image
+    global map_bounds, map_colliders, map_background_image
 
     map_background_image = map_image
+    map_bounds = [0, 0, map_image.get_width(), map_image.get_height()]
 
     # Walls
     map_colliders = []
@@ -200,7 +202,18 @@ def player_input_handle(player_index, input_event):
                     new_dist_vector = scale_vector(dist_vector, PLAYER_MAX_TELEPORT_DIST)
                     teleport_target = [player_center[0] + new_dist_vector[0], player_center[1] + new_dist_vector[1]]
                 player_dest_rect = [teleport_target[0] - (player_rect[2] // 2), teleport_target[1] - (player_rect[3] // 2), player_rect[2], player_rect[3]]
-                for collider in map_colliders:
+                stop_colliders = []
+                stop_colliders += [collider for collider in map_colliders]
+                stop_colliders += [player_rect_get(other_player_index) for other_player_index in range(0, player_count_get()) if other_player_index != player_index]
+                if not point_in_rect(player_dest_rect, map_bounds):
+                    backstep = [player_center[0] - teleport_target[0], player_center[1] - teleport_target[1]]
+                    backstep_magnitude = math.sqrt((backstep[0] ** 2) + (backstep[1] ** 2))
+                    unit_backstep = [backstep[0] / backstep_magnitude, backstep[1] / backstep_magnitude]
+                    while not point_in_rect(player_dest_rect, map_bounds):
+                        teleport_target[0] += unit_backstep[0]
+                        teleport_target[1] += unit_backstep[1]
+                        player_dest_rect = [teleport_target[0] - (player_rect[2] // 2), teleport_target[1] - (player_rect[3] // 2), player_rect[2], player_rect[3]]
+                for collider in stop_colliders:
                     if collision_check_rectangles(player_dest_rect, collider):
                         backstep = [player_center[0] - teleport_target[0], player_center[1] - teleport_target[1]]
                         backstep_magnitude = math.sqrt((backstep[0] ** 2) + (backstep[1] ** 2))
@@ -517,6 +530,8 @@ def state_data_get():
         player_data_entry.append(round(player_velocity[player_index][1], 2))
         player_data_entry.append(int(player_health[player_index]))
         player_data_entry.append(int(player_hurt_timer[player_index]))
+        for timer_value in player_spell_cooldown_timers[player_index]:
+            player_data_entry.append(int(timer_value))
         if player_teleport_dest[player_index] is not None:
             player_data_entry.append(int(player_teleport_dest[player_index][0]))
             player_data_entry.append(int(player_teleport_dest[player_index][1]))
@@ -566,11 +581,13 @@ def state_data_set(state_data):
         player_velocity[player_index][1] = float(player_data[player_index][3])
         player_health[player_index] = int(player_data[player_index][4])
         player_hurt_timer[player_index] = int(player_data[player_index][5])
-        if len(player_data[player_index]) == 8:
-            player_teleport_dest[player_index] = [int(player_data[player_index][6]), int(player_data[player_index][7])]
+        for i in range(0, len(player_spell_cooldown_timers[player_index])):
+            player_spell_cooldown_timers[player_index][i] = int(player_data[player_index][6 + i])
+        if len(player_data[player_index]) == 12:
+            player_teleport_dest[player_index] = [int(player_data[player_index][10]), int(player_data[player_index][11])]
         else:
             player_teleport_dest[player_index] = None
-            player_teleport_cooldown_timer[player_index] = int(player_data[player_index][6])
+            player_teleport_cooldown_timer[player_index] = int(player_data[player_index][10])
 
     spell_data = state_data[1]
     spell_instances = []
