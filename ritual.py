@@ -99,9 +99,14 @@ def menu():
 
     connecting_label = font_small.render("Connecting... ", False, color_white)
     connecting_label_coords = [(DISPLAY_WIDTH // 2) - (connecting_label.get_width() // 2), 100]
+    connecting_timeout_label = font_small.render("Connection timed out", False, color_white)
+    connecting_timeout_label_coords = [(DISPLAY_WIDTH // 2) - (connecting_timeout_label.get_width() // 2), 100]
     cancel_label = font_small.render("Cancel", False, color_white)
     cancel_label_offcolor = font_small.render("Cancel", False, color_black)
     cancel_label_coords = [button_rects[1][0] + 5, button_rects[1][1] + 2]
+    connection_ping_timer = 0
+    connection_ping_delay = 60
+    connection_ping_attempts = 5
 
     input_username = ""
     username_label = font_small.render("Enter username: ", False, color_white)
@@ -130,14 +135,10 @@ def menu():
                         button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[i])
                         if button_hovered:
                             if i == 0:
-                                # return_gamestate = GAMESTATE_GAME
-                                # running = False
                                 menu_state = 1
                             elif i == 1:
                                 connect_as_server = True
                                 network.server_begin(3535)
-                                # return_gamestate = GAMESTATE_GAME
-                                # running = False
                                 menu_state = 3
                 elif menu_state == 2:
                     if point_in_rect((mouse_x, mouse_y), button_rects[1]):
@@ -164,6 +165,8 @@ def menu():
                         ip_box_input = ip_box_input[:len(ip_box_input) - 1]
                     elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
                         menu_state = 2
+                        connection_ping_timer = connection_ping_delay
+                        connection_ping_attempts = 5
                         network.client_connect(ip_box_input, 3535)
                 elif menu_state == 3:
                     if event.key >= pygame.K_a and event.key <= pygame.K_z:
@@ -181,9 +184,9 @@ def menu():
                     elif event.key == pygame.K_RETURN:
                         if connect_as_server:
                             network.server_set_username(input_username)
+                            menu_state = 4
                         else:
                             network.client_send_username(input_username)
-                        menu_state = 4
 
         display_clear()
 
@@ -201,7 +204,10 @@ def menu():
             ip_input_label = font_small.render(ip_box_input, False, color_white)
             display.blit(ip_input_label, (ip_box_rect[0] + 5, ip_box_rect[1] + 2))
         elif menu_state == 2:
-            display.blit(connecting_label, connecting_label_coords)
+            if connection_ping_attempts != 0:
+                display.blit(connecting_label, connecting_label_coords)
+            else:
+                display.blit(connecting_timeout_label, connecting_timeout_label_coords)
             button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[1])
             if button_hovered:
                 pygame.draw.rect(display, color_white, button_rects[1], False)
@@ -209,15 +215,26 @@ def menu():
             else:
                 pygame.draw.rect(display, color_white, button_rects[1], 1)
                 display.blit(cancel_label, cancel_label_coords)
-            player_index = network.client_check_response()
-            if player_index != -1:
-                local_player_index = player_index
+            if connection_ping_attempts != 0:
+                connection_ping_timer -= 1
+                if connection_ping_timer <= 0:
+                    connection_ping_attempts -= 1
+                    if connection_ping_attempts != 0:
+                        connection_ping_timer = connection_ping_delay
+                        network.client_connect(ip_box_input, 3535)
+
+            if network.client_check_response():
                 menu_state = 3
         elif menu_state == 3:
             display.blit(username_label, ip_label_coords)
             pygame.draw.rect(display, color_white, ip_box_rect, 1)
             username_input_label = font_small.render(input_username, False, color_white)
             display.blit(username_input_label, (ip_box_rect[0] + 5, ip_box_rect[1] + 2))
+            if not connect_as_server:
+                player_index = network.client_check_response()
+                if player_index != 0:
+                    local_player_index = player_index
+                    menu_state = 4
         elif menu_state == 4:
             for index in range(0, len(team_box_rect)):
                 pygame.draw.rect(display, color_white, team_box_rect[index], 1)
@@ -288,7 +305,7 @@ def game():
     display_render_loadscreen("Initializing players...")
     for username in player_usernames:
         gamestate.create_player()
-    gamestate.player_camera_position_set(local_player_index)
+    gamestate.player_camera_initial_position_set(local_player_index)
 
     text_death = font_big.render("You Died", False, color_red)
     text_victory = font_big.render("You Won!", False, color_green)

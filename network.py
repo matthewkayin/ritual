@@ -68,13 +68,16 @@ def server_read():
             message = message.decode()
             if message == "c":
                 if not server_game_started and len(server_client_read_buffer.keys()) < 9:
-                    next_player_index = len(server_client_read_buffer.keys()) + 1
-                    response = "welc" + str(next_player_index) + "\n"
+                    response = "u?"
                     server_listener.sendto(response.encode(), address)
-                    server_client_usernames[address] = "new player"
-                    server_client_userteams[address] = False
-                    server_client_read_buffer[address] = ""
-                    server_client_ping[address] = True
+            elif message.startswith("u="):
+                next_player_index = len(server_client_read_buffer.keys()) + 1
+                response = "welc" + str(next_player_index) + "\n"
+                server_listener.sendto(response.encode(), address)
+                server_client_usernames[address] = message[message.index("=") + 1:]
+                server_client_userteams[address] = False
+                server_client_read_buffer[address] = ""
+                server_client_ping[address] = True
 
     # Read from player buffers
     current_player_index = 1
@@ -163,10 +166,12 @@ def client_check_response():
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
         message = message.decode()
-        if message.startswith("welc"):
+        if message.startswith("u?"):
+            return 1
+        elif message.startswith("welc"):
             return int(message[message.index("c") + 1:message.index("\n")])
 
-    return -1
+    return 0
 
 
 def client_send_username(username):
