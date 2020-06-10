@@ -1,6 +1,7 @@
 import socket
 import select
 
+
 SERVER_EVENT_NEW_PLAYER = 0
 SERVER_EVENT_PLAYER_INPUT = 1
 
@@ -17,7 +18,7 @@ server_client_ping = {}
 
 
 def server_begin(port):
-    global server_listener
+    global server_listener 
 
     server_ip = "127.0.0.1"
     server_finder = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -53,19 +54,18 @@ def server_read():
     readable, writable, exceptionable = select.select([server_listener], [], [], 0.001)
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
+        message = message.decode()
         if address in list(server_client_read_buffer.keys()):
             if server_game_started:
-                server_client_read_buffer[address] += message.decode()
+                server_client_read_buffer[address] += message
                 server_client_ping[address] = True
             else:
-                message = message.decode()
                 if message == "t\n":
                     server_client_userteams[address] = not server_client_userteams[address]
                 elif message.startswith("u="):
                     server_client_usernames[address] = message[message.index("=") + 1:]
                 server_client_ping[address] = True
         else:
-            message = message.decode()
             if message == "c":
                 if not server_game_started and len(server_client_read_buffer.keys()) < 9:
                     response = "u?"
@@ -151,6 +151,7 @@ client_server_address = None
 client_connected = False
 client_server_buffer = ""
 client_event_queue = []
+client_received_packets = 0
 
 
 def client_connect(server_ip, server_port):
@@ -180,7 +181,7 @@ def client_send_username(username):
 
 
 def client_read():
-    global client_socket, client_connected, client_server_buffer, client_most_recent_tick
+    global client_socket, client_connected, client_server_buffer, client_received_packets
 
     return_data = []
 
@@ -190,6 +191,7 @@ def client_read():
         client_server_buffer += message.decode()
 
     while "\n" in client_server_buffer:
+        client_received_packets += 1
         terminator_index = client_server_buffer.index("\n")
         command = client_server_buffer[:terminator_index]
         client_server_buffer = client_server_buffer[terminator_index + 1:]

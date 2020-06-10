@@ -314,6 +314,7 @@ def game():
     before_time = pygame.time.get_ticks()
     ping_before_time = before_time
     pinging = False
+    last_pings = []
 
     while running:
         # Input
@@ -379,8 +380,12 @@ def game():
         else:
             server_data = network.client_read()
 
-            ping = pygame.time.get_ticks() - ping_before_time
-            pinging = False
+            if len(server_data) != 0:
+                if len(last_pings) >= 10:
+                    last_pings.pop(0)
+                last_pings.append(pygame.time.get_ticks() - ping_before_time)
+                ping = sum(last_pings) / len(last_pings)
+                pinging = False
 
             for command in server_data:
                 if command[0] == "set_state":
@@ -393,7 +398,7 @@ def game():
         gamestate.player_camera_position_set(local_player_index)
         gamestate.gameover_timer_update(local_player_index, delta)
 
-        if game_is_over and gamestate.gameover_state_get(local_player_index) == 0: 
+        if game_is_over and gamestate.gameover_state_get(local_player_index) == 0:
             gamestate.player_camera_position_set(local_player_index)
             game_is_over = False
 
