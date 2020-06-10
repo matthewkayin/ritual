@@ -404,14 +404,13 @@ def game():
                     gamestate.state_data_set(command[1:])
 
             if state_was_set:
-                if local_tick == -1:
-                    local_tick = network.client_last_server_tick
-                else:
+                if local_tick != -1:
                     tick_difference = 0
                     if local_tick > network.client_last_server_tick:
                         tick_difference = local_tick - network.client_last_server_tick
                     elif network.client_last_server_tick > 900 and local_tick < 100:
                         tick_difference = (999 - network.client_last_server_tick) + local_tick
+                        print("it was this, wasn't it?")
                     if tick_difference > 0:
                         # apply input server hasn't handled
                         while len(input_cache) != 0:
@@ -419,8 +418,10 @@ def game():
                             gamestate.player_input_queue_append(local_player_index, input_event)
                         gamestate.player_input_queue_pump_events(local_player_index)
                         # simulate gap frames
+                        print("simulating - " + str(tick_difference))
                         gamestate.update(tick_difference)
                 input_cache = []
+                local_tick = network.client_last_server_tick
 
 
         # Update gamestate
