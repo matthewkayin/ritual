@@ -15,6 +15,7 @@ server_client_read_buffer = {}
 server_client_usernames = {}
 server_client_userteams = {}
 server_client_ping = {}
+server_client_inputs_received = {}
 
 
 def server_begin(port):
@@ -78,6 +79,7 @@ def server_read():
                 server_client_userteams[address] = False
                 server_client_read_buffer[address] = ""
                 server_client_ping[address] = True
+                server_client_inputs_received[address] = 0
 
     # Read from player buffers
     current_player_index = 1
@@ -96,10 +98,11 @@ def server_read():
             else:
                 command_items = [int(command_items[0]), int(command_items[1]), (int(command_items[2]), int(command_items[3]))]
             server_event_queue.append([SERVER_EVENT_PLAYER_INPUT, current_player_index, command_items])
+            server_client_inputs_received[address] += 1
         current_player_index += 1
 
 
-def server_write(current_tick, state_data):
+def server_write(state_data):
     global server_listener, server_client_read_buffer
 
     state_string = ""
@@ -127,11 +130,12 @@ def server_write(current_tick, state_data):
     state_string += spell_string
 
     state_string += "\n"
-    state_string = str(current_tick) + "#" + state_string
 
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
-            server_listener.sendto(state_string.encode(), address)
+            out_string = str(server_client_inputs_received[address]) + "#" + state_string
+            server_client_inputs_received[address] = 0
+            server_listener.sendto(out_string.encode(), address)
             server_client_ping[address] = False
 
 
@@ -152,7 +156,7 @@ client_server_address = None
 client_connected = False
 client_server_buffer = ""
 client_event_queue = []
-client_last_server_tick = -1
+client_server_inputs_received = 0
 
 
 def client_connect(server_ip, server_port):
@@ -182,7 +186,7 @@ def client_send_username(username):
 
 
 def client_read():
-    global client_socket, client_connected, client_server_buffer, client_last_server_tick
+    global client_socket, client_connected, client_server_buffer, client_server_inputs_received
 
     return_data = []
 
@@ -199,7 +203,7 @@ def client_read():
         if command.startswith("u="):
             continue
         else:
-            client_last_server_tick = int(command[:command.index("#")])
+            client_server_inputs_received = int(command[:command.index("#")])
             command = command[command.index("#") + 1:]
             return_data_entry = []
             return_data_entry.append("set_state")

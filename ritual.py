@@ -315,9 +315,6 @@ def game():
     ping_before_time = before_time
     pinging = False
     last_pings = []
-    local_tick = -1
-    if connect_as_server:
-        local_tick = 0
 
     input_cache = []
 
@@ -380,8 +377,6 @@ def game():
                 gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
             gamestate.player_input_queue_pump_events(local_player_index)
 
-        extra_delta = 0
-
         # Read network
         if connect_as_server:
             network.server_read()
@@ -406,34 +401,16 @@ def game():
                     gamestate.state_data_set(command[1:])
 
             if state_was_set:
-                if local_tick != -1:
-                    tick_difference = 0
-                    if local_tick > network.client_last_server_tick:
-                        tick_difference = local_tick - network.client_last_server_tick
-                    elif network.client_last_server_tick > 900 and local_tick < 100:
-                        tick_difference = (999 - network.client_last_server_tick) + local_tick
-                        print("it was this, wasn't it?")
-                    if tick_difference > 0:
-                        # apply input server hasn't handled
-                        while len(input_cache) != 0:
-                            input_event = input_cache.pop(0)
-                            gamestate.player_input_queue_append(local_player_index, input_event)
-                        gamestate.player_input_queue_pump_events(local_player_index)
-                        # simulate gap frames
-                        print("simulating - " + str(tick_difference))
-                        # gamestate.update(tick_difference)
-                        extra_delta = tick_difference
-                input_cache = []
-                local_tick = network.client_last_server_tick
+                if network.client_server_inputs_received < len(input_cache):
+                    for input_index in range(network.client_server_inputs_received, len(input_cache)):
+                        input_event = input_cache[input_index]
+                        gamestate.player_input_queue_append(local_player_index, input_event)
+                input_cache = input_cache[network.client_server_inputs_received:]
 
         # Update gamestate
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
-        if local_tick != -1:
-            local_tick += delta
-            if local_tick > 999:
-                local_tick -= 999
         before_time = pygame.time.get_ticks()
-        gamestate.update(delta + extra_delta)
+        gamestate.update(delta)
         gamestate.player_camera_position_set(local_player_index)
         gamestate.gameover_timer_update(local_player_index, delta)
 
@@ -443,7 +420,7 @@ def game():
 
         # Write network
         if connect_as_server:
-            network.server_write(int(local_tick), gamestate.state_data_get())
+            network.server_write(gamestate.state_data_get())
         else:
             if not pinging:
                 ping_before_time = pygame.time.get_ticks()
