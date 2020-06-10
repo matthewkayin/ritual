@@ -403,6 +403,8 @@ def game():
                     state_was_set = True
                     gamestate.state_data_set(command[1:])
 
+        extra_delta = 0
+
             if state_was_set:
                 if local_tick != -1:
                     tick_difference = 0
@@ -419,10 +421,10 @@ def game():
                         gamestate.player_input_queue_pump_events(local_player_index)
                         # simulate gap frames
                         print("simulating - " + str(tick_difference))
-                        gamestate.update(tick_difference)
+                        # gamestate.update(tick_difference)
+                        extra_delta = tick_difference
                 input_cache = []
                 local_tick = network.client_last_server_tick
-
 
         # Update gamestate
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
@@ -431,7 +433,7 @@ def game():
             if local_tick > 999:
                 local_tick -= 999
         before_time = pygame.time.get_ticks()
-        gamestate.update(delta)
+        gamestate.update(delta + extra_delta)
         gamestate.player_camera_position_set(local_player_index)
         gamestate.gameover_timer_update(local_player_index, delta)
 
