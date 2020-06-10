@@ -380,6 +380,8 @@ def game():
                 gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
             gamestate.player_input_queue_pump_events(local_player_index)
 
+        extra_delta = 0
+
         # Read network
         if connect_as_server:
             network.server_read()
@@ -402,8 +404,6 @@ def game():
                 if command[0] == "set_state":
                     state_was_set = True
                     gamestate.state_data_set(command[1:])
-
-        extra_delta = 0
 
             if state_was_set:
                 if local_tick != -1:
