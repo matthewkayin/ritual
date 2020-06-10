@@ -196,12 +196,11 @@ def client_read():
         command = client_server_buffer[:terminator_index]
         client_server_buffer = client_server_buffer[terminator_index + 1:]
 
-        client_last_server_tick = int(command[:command.index("#")])
-        command = command[command.index("#") + 1:]
-
         if command.startswith("u="):
             continue
         else:
+            client_last_server_tick = int(command[:command.index("#")])
+            command = command[command.index("#") + 1:]
             return_data_entry = []
             return_data_entry.append("set_state")
 
