@@ -315,6 +315,11 @@ def game():
     ping_before_time = before_time
     pinging = False
     last_pings = []
+    local_tick = -1
+    if connect_as_server:
+        local_tick = 0
+
+    input_cache = []
 
     while running:
         # Input
@@ -335,6 +340,7 @@ def game():
                     gamestate.player_input_queue_append(local_player_index, (True, input_name))
                     if not connect_as_server:
                         network.client_event_queue.append((True, input_name))
+                        input_cache.append((True, input_name))
             elif event.type == pygame.KEYUP:
                 input_name = None
                 if event.key == pygame.K_w:
@@ -349,26 +355,30 @@ def game():
                     gamestate.player_input_queue_append(local_player_index, (False, input_name))
                     if not connect_as_server:
                         network.client_event_queue.append((False, input_name))
+                        input_cache.append((False, input_name))
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
                     gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_SPELLCAST, mouse_pos))
                     if not connect_as_server:
                         network.client_event_queue.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
+                        input_cache.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
                 elif event.button == 3:
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
                     gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_TELEPORT, mouse_pos))
                     if not connect_as_server:
                         network.client_event_queue.append((True, gamestate.INPUT_TELEPORT, mouse_pos))
+                        input_cache.append((True, gamestate.INPUT_TELEPORT, mouse_pos))
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
                     gamestate.player_input_queue_append(local_player_index, (False, gamestate.INPUT_SPELLCAST, mouse_pos))
                     if not connect_as_server:
                         network.client_event_queue.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
+                        input_cache.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
             elif event.type == pygame.MOUSEMOTION:
                 gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
-        gamestate.player_input_queue_pump_events(local_player_index)
+            gamestate.player_input_queue_pump_events(local_player_index)
 
         # Read network
         if connect_as_server:
@@ -387,12 +397,38 @@ def game():
                 ping = sum(last_pings) / len(last_pings)
                 pinging = False
 
+            state_was_set = False
             for command in server_data:
                 if command[0] == "set_state":
+                    state_was_set = True
                     gamestate.state_data_set(command[1:])
+
+            if state_was_set:
+                if local_tick == -1:
+                    local_tick = network.client_last_server_tick
+                else:
+                    tick_difference = 0
+                    if local_tick > network.client_last_server_tick:
+                        tick_difference = local_tick - network.client_last_server_tick
+                    elif network.client_last_server_tick > 900 and local_tick < 100:
+                        tick_difference = (999 - network.client_last_server_tick) + local_tick
+                    if tick_difference > 0:
+                        # apply input server hasn't handled
+                        while len(input_cache) != 0:
+                            input_event = input_cache.pop(0)
+                            gamestate.player_input_queue_append(local_player_index, input_event)
+                        gamestate.player_input_queue_pump_events(local_player_index)
+                        # simulate gap frames
+                        gamestate.update(tick_difference)
+                input_cache = []
+
 
         # Update gamestate
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
+        if local_tick != -1:
+            local_tick += delta
+            if local_tick > 999:
+                local_tick -= 999
         before_time = pygame.time.get_ticks()
         gamestate.update(delta)
         gamestate.player_camera_position_set(local_player_index)
@@ -404,7 +440,7 @@ def game():
 
         # Write network
         if connect_as_server:
-            network.server_write(gamestate.state_data_get())
+            network.server_write(int(local_tick), gamestate.state_data_get())
         else:
             if not pinging:
                 ping_before_time = pygame.time.get_ticks()

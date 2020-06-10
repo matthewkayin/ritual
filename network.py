@@ -99,7 +99,7 @@ def server_read():
         current_player_index += 1
 
 
-def server_write(state_data):
+def server_write(current_tick, state_data):
     global server_listener, server_client_read_buffer
 
     state_string = ""
@@ -127,6 +127,7 @@ def server_write(state_data):
     state_string += spell_string
 
     state_string += "\n"
+    state_string = str(current_tick) + "#" + state_string
 
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
@@ -151,7 +152,7 @@ client_server_address = None
 client_connected = False
 client_server_buffer = ""
 client_event_queue = []
-client_received_packets = 0
+client_last_server_tick = -1
 
 
 def client_connect(server_ip, server_port):
@@ -181,7 +182,7 @@ def client_send_username(username):
 
 
 def client_read():
-    global client_socket, client_connected, client_server_buffer, client_received_packets
+    global client_socket, client_connected, client_server_buffer, client_last_server_tick
 
     return_data = []
 
@@ -191,10 +192,12 @@ def client_read():
         client_server_buffer += message.decode()
 
     while "\n" in client_server_buffer:
-        client_received_packets += 1
         terminator_index = client_server_buffer.index("\n")
         command = client_server_buffer[:terminator_index]
         client_server_buffer = client_server_buffer[terminator_index + 1:]
+
+        client_last_server_tick = int(command[:command.index("#")])
+        command = command[command.index("#") + 1:]
 
         if command.startswith("u="):
             continue
