@@ -202,9 +202,7 @@ def client_read():
         command = client_server_buffer[:terminator_index]
         client_server_buffer = client_server_buffer[terminator_index + 1:]
 
-        if command.startswith("u="):
-            continue
-        else:
+        if command.contains("#"):
             state_header = command[:command.index("#")].split(",")
             client_server_inputs_received = int(state_header[0])
             client_server_previous_tick = client_server_current_tick
