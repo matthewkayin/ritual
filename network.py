@@ -102,7 +102,7 @@ def server_read():
         current_player_index += 1
 
 
-def server_write(state_data):
+def server_write(current_tick, state_data):
     global server_listener, server_client_read_buffer
 
     state_string = ""
@@ -133,7 +133,7 @@ def server_write(state_data):
 
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
-            out_string = str(server_client_inputs_received[address]) + "#" + state_string
+            out_string = str(server_client_inputs_received[address]) + "," + str(current_tick) + "#" + state_string
             server_client_inputs_received[address] = 0
             server_listener.sendto(out_string.encode(), address)
             server_client_ping[address] = False
@@ -157,6 +157,8 @@ client_connected = False
 client_server_buffer = ""
 client_event_queue = []
 client_server_inputs_received = 0
+client_server_previous_tick = 0
+client_server_current_tick = 0
 
 
 def client_connect(server_ip, server_port):
@@ -186,7 +188,7 @@ def client_send_username(username):
 
 
 def client_read():
-    global client_socket, client_connected, client_server_buffer, client_server_inputs_received
+    global client_socket, client_connected, client_server_buffer, client_server_inputs_received, client_server_previous_tick, client_server_current_tick
 
     return_data = []
 
@@ -203,7 +205,10 @@ def client_read():
         if command.startswith("u="):
             continue
         else:
-            client_server_inputs_received = int(command[:command.index("#")])
+            state_header = command[:command.index("#")].split(",")
+            client_server_inputs_received = int(state_header[0])
+            client_server_previous_tick = client_server_current_tick
+            client_server_current_tick = float(state_header[1])
             command = command[command.index("#") + 1:]
             return_data_entry = []
             return_data_entry.append("set_state")

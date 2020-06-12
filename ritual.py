@@ -317,6 +317,9 @@ def game():
     last_pings = []
 
     input_cache = []
+    local_tick = 0
+    last_client_read_tick = -1
+    interpolation_ticks = 0
 
     while running:
         # Input
@@ -410,7 +413,33 @@ def game():
         # Update gamestate
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
         before_time = pygame.time.get_ticks()
-        gamestate.update(delta)
+
+        local_tick += delta
+        if local_tick > 999:
+            local_tick -= 999
+
+        if not connect_as_server:
+            if last_client_read_tick != -1:
+                local_tick_difference = -1
+                if local_tick < last_client_read_tick:
+                    local_tick_difference = (999 - last_client_read_tick) + local_tick
+                else:
+                    local_tick_difference = local_tick - last_client_read_tick
+                server_tick_difference = -1
+                if network.client_server_current_tick < network.client_server_previous_tick:
+                    server_tick_difference = (999 - network.client_server_previous_tick) + network.client_server_previous_tick
+                else:
+                    server_tick_difference = network.client_server_current_tick - network.client_server_previous_tick
+                if local_tick_difference > server_tick_difference:
+                    interpolation_delta = local_tick_difference - server_tick_difference
+                    print("interpolation delta = " + str(interpolation_delta))
+                    # gamestate.update(interpolation_delta)
+                    interpolation_ticks += interpolation_delta
+            last_client_read_tick = local_tick
+
+        interpolation = min(interpolation_ticks, 1)
+        interpolation_ticks -= interpolation
+        gamestate.update(delta + interpolation)
         gamestate.player_camera_position_set(local_player_index)
         gamestate.gameover_timer_update(local_player_index, delta)
 
@@ -420,7 +449,7 @@ def game():
 
         # Write network
         if connect_as_server:
-            network.server_write(gamestate.state_data_get())
+            network.server_write(round(local_tick, 2), gamestate.state_data_get())
         else:
             if not pinging:
                 ping_before_time = pygame.time.get_ticks()
