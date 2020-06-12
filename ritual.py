@@ -431,6 +431,7 @@ def game():
                 else:
                     server_tick_difference = network.client_server_current_tick - network.client_server_previous_tick
                 if local_tick_difference > server_tick_difference:
+                    interpolation_ticks = 0
                     interpolation_delta = local_tick_difference - server_tick_difference
                     print("interpolation delta = " + str(interpolation_delta))
                     # gamestate.update(interpolation_delta)
