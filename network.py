@@ -53,7 +53,7 @@ def server_read():
     # Read from socket and fill player buffers
     readable, writable, exceptionable = select.select([server_listener], [], [], 0.001)
     for ready_socket in readable:
-        message, address = ready_socket.recvfrom(1024)
+        message, address = ready_socket.recvfrom(4096)
         message = message.decode()
         if address in list(server_client_read_buffer.keys()):
             if server_game_started:
@@ -187,7 +187,7 @@ def client_read():
 
     readable, writable, exceptionalbe = select.select([client_socket], [], [], 0.001)
     for ready_socket in readable:
-        message, address = ready_socket.recvfrom(1024)
+        message, address = ready_socket.recvfrom(4096)
         client_server_buffer += message.decode()
 
     while "\n" in client_server_buffer:
