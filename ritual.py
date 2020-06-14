@@ -59,7 +59,6 @@ GAMESTATE_GAME = 1
 connect_as_server = False
 local_player_index = 0
 player_usernames = []
-player_teams = []
 
 
 def menu():
@@ -70,57 +69,45 @@ def menu():
 
     mouse_x, mouse_y = (0, 0)
 
-    button_rects = []
-    button_text_coords = []
-    button_texts = []
-    button_texts_offcolor = []
-    button_width = 50
-    button_height = 20
-    button_padding = 10
-    button_text_strings = ("Join", "Host")
-    for i in range(0, len(button_text_strings)):
-        button_x = (DISPLAY_WIDTH // 2) - (button_width // 2)
-        button_y = 100 + ((button_height + button_padding) * i)
-        button_rects.append((button_x, button_y, button_width, button_height))
-        button_texts.append(font_small.render(button_text_strings[i], False, color_white))
-        button_texts_offcolor.append(font_small.render(button_text_strings[i], False, color_black))
-        button_text_x = button_x + (button_width // 2) - (button_texts[i].get_width() // 2)
-        button_text_y = button_y + (button_height // 2) - (button_texts[i].get_height() // 2)
-        button_text_coords.append((button_text_x, button_text_y))
-
-    ip_box_width = 200
-    ip_box_height = 20
-    ip_box_rect = [(DISPLAY_WIDTH // 2) - (ip_box_width // 2), 100, ip_box_width, ip_box_height]
-    ip_box_label = font_small.render("Enter Host IP: ", False, color_white)
-    ip_label_coords = [ip_box_rect[0] + 10, ip_box_rect[1] - 16]
-    ip_box_number_keys = [pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]
-    ip_box_numpad_keys = [pygame.K_KP0, pygame.K_KP1, pygame.K_KP2, pygame.K_KP3, pygame.K_KP4, pygame.K_KP5, pygame.K_KP6, pygame.K_KP7, pygame.K_KP8, pygame.K_KP9]
-    ip_box_input = ""
-
-    connecting_label = font_small.render("Connecting... ", False, color_white)
-    connecting_label_coords = [(DISPLAY_WIDTH // 2) - (connecting_label.get_width() // 2), 100]
-    connecting_timeout_label = font_small.render("Connection timed out", False, color_white)
-    connecting_timeout_label_coords = [(DISPLAY_WIDTH // 2) - (connecting_timeout_label.get_width() // 2), 100]
-    cancel_label = font_small.render("Cancel", False, color_white)
-    cancel_label_offcolor = font_small.render("Cancel", False, color_black)
-    cancel_label_coords = [button_rects[1][0] + 5, button_rects[1][1] + 2]
-    connection_ping_timer = 0
-    connection_ping_delay = 60
-    connection_ping_attempts = 5
-
-    input_username = ""
-    username_label = font_small.render("Enter username: ", False, color_white)
-
-    team_box_rect = [[10, 10, 200, DISPLAY_HEIGHT - 20]]
-    team_box_rect.append([team_box_rect[0][0] + team_box_rect[0][2] + team_box_rect[0][0], team_box_rect[0][1], team_box_rect[0][2], team_box_rect[0][3]])
-    team_box_buttons = [[team_box_rect[1][0] + team_box_rect[0][0] + team_box_rect[0][2], team_box_rect[0][0], 100, 50]]
-    team_box_buttons.append([team_box_buttons[0][0], team_box_buttons[0][1] + team_box_buttons[0][3] + team_box_buttons[0][1], team_box_buttons[0][2], team_box_buttons[0][3]])
-    team_box_labels = [font_small.render("Change Team", False, color_white), font_small.render("Start Game", False, color_white)]
-    team_box_labels_offcolor = [font_small.render("Change Team", False, color_black), font_small.render("Start Game", False, color_black)]
-    team_box_label_coords = [(team_box_buttons[0][0] + 10, team_box_buttons[0][1] + 15), (team_box_buttons[1][0] + 10, team_box_buttons[1][1] + 15)]
-    client_should_request_team_swap = False
-
     menu_state = 0
+    menu_labels = []
+    menu_buttons = []
+    menu_textbox_type = []
+    menu_shows_playerlist = []
+
+    textbox_rect = [(DISPLAY_WIDTH // 2) - 125, 100, 250, 20]
+    textbox_input = ""
+    playerlist_rect = [(DISPLAY_WIDTH // 2) - 200 - 20, (DISPLAY_HEIGHT // 2) - 150, 200, 300]
+
+    # Menu state 0
+    menu_labels.append([("Ritual", -1, 75)])
+    menu_buttons.append([("Join", -1, 125, 50, 20), ("Host", -1, 150, 50, 20)])
+    menu_textbox_type.append(0)
+    menu_shows_playerlist.append(False)
+
+    # Menu state 1
+    menu_labels.append([("Enter your username: ", textbox_rect[0] + 20, textbox_rect[1] - 20)])
+    menu_buttons.append([])
+    menu_textbox_type.append(1)
+    menu_shows_playerlist.append(False)
+
+    # Menu state 2
+    menu_labels.append([("Enter host IP: ", textbox_rect[0] + 20, textbox_rect[1] - 20)])
+    menu_buttons.append([])
+    menu_textbox_type.append(2)
+    menu_shows_playerlist.append(False)
+
+    # Menu state 3
+    menu_labels.append([("Connecting... ", -1, 75)])
+    menu_buttons.append([("Cancel", -1, 125, 50, 20)])
+    menu_textbox_type.append(0)
+    menu_shows_playerlist.append(False)
+
+    # Menu state 4
+    menu_labels.append([])
+    menu_buttons.append([])
+    menu_textbox_type.append(0)
+    menu_shows_playerlist.append(True)
 
     while running:
         # Input
@@ -129,154 +116,122 @@ def menu():
                 running = False
             elif event.type == pygame.MOUSEMOTION:
                 mouse_x, mouse_y = event.pos[0] // SCALE, event.pos[1] // SCALE
-            elif event.type == pygame.MOUSEBUTTONUP:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Do nothing if there are no buttons to press
+                if len(menu_buttons[menu_state]) == 0:
+                    continue
+                button_pressed = -1
+                for button_index in range(0, len(menu_buttons[menu_state])):
+                    button_rect = list(menu_buttons[menu_state][button_index][1:])
+                    if button_rect[0] == -1:
+                        button_rect[0] = (DISPLAY_WIDTH // 2) - (button_rect[2] // 2)
+                    if button_rect[1] == -1:
+                        button_rect[1] = (DISPLAY_HEIGHT // 2) - (button_rect[3] // 2)
+                    if point_in_rect((mouse_x, mouse_y), button_rect):
+                        button_pressed = button_index
+                        break
+
                 if menu_state == 0:
-                    for i in range(0, len(button_rects)):
-                        button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[i])
-                        if button_hovered:
-                            if i == 0:
-                                menu_state = 1
-                            elif i == 1:
-                                connect_as_server = True
-                                network.server_begin(3535)
-                                menu_state = 3
-                elif menu_state == 2:
-                    if point_in_rect((mouse_x, mouse_y), button_rects[1]):
-                        menu_state = 0
-                elif menu_state == 4:
-                    if point_in_rect((mouse_x, mouse_y), team_box_buttons[0]):
-                        if connect_as_server:
-                            network.server_team = not network.server_team
-                        else:
-                            client_should_request_team_swap = True
-                    elif point_in_rect((mouse_x, mouse_y), team_box_buttons[1]):
-                        network.server_start_game()
-                        running = False
-                        return_gamestate = GAMESTATE_GAME
-            elif event.type == pygame.KEYDOWN:
-                if menu_state == 1:
-                    if event.key in ip_box_number_keys:
-                        ip_box_input += str(ip_box_number_keys.index(event.key))
-                    elif event.key in ip_box_numpad_keys:
-                        ip_box_input += str(ip_box_numpad_keys.index(event.key))
-                    elif event.key == pygame.K_PERIOD or event.key == pygame.K_KP_PERIOD:
-                        ip_box_input += "."
-                    elif event.key == pygame.K_BACKSPACE:
-                        ip_box_input = ip_box_input[:len(ip_box_input) - 1]
-                    elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
+                    if button_pressed == 0:
                         menu_state = 2
-                        connection_ping_timer = connection_ping_delay
-                        connection_ping_attempts = 5
-                        network.client_connect(ip_box_input, 3535)
+                    elif button_pressed == 1:
+                        connect_as_server = True
+                        menu_state = 1
                 elif menu_state == 3:
-                    if event.key >= pygame.K_a and event.key <= pygame.K_z:
-                        if len(input_username) < 35:
-                            keystates = pygame.key.get_pressed()
-                            if keystates[pygame.K_LSHIFT] or keystates[pygame.K_RSHIFT]:
-                                input_username += str(chr(event.key)).upper()
-                            else:
-                                input_username += chr(event.key)
-                    elif event.key == pygame.K_SPACE:
-                        if len(input_username) < 35:
-                            input_username += " "
-                    elif event.key == pygame.K_BACKSPACE:
-                        input_username = input_username[:len(input_username) - 1]
-                    elif event.key == pygame.K_RETURN:
-                        if connect_as_server:
-                            network.server_set_username(input_username)
-                            menu_state = 4
-                        else:
-                            network.client_send_username(input_username)
+                    if button_pressed == 0:
+                        menu_state = 2
+                elif menu_state == 4:
+                    if button_pressed == 0:
+                        network.server_start_game()
+                        return_gamestate = GAMESTATE_GAME
+                        running = False
+            elif event.type == pygame.KEYDOWN:
+                if menu_textbox_type[menu_state] == 0:
+                    continue
+                if menu_textbox_type[menu_state] == 1 and event.key >= pygame.K_a and event.key <= pygame.K_z:
+                    textbox_input += chr(event.key)
+                elif menu_textbox_type[menu_state] == 2 and event.key >= pygame.K_0 and event.key <= pygame.K_9:
+                    textbox_input += chr(event.key)
+                elif menu_textbox_type[menu_state] == 2 and event.key == pygame.K_PERIOD:
+                    textbox_input += chr(event.key)
+                elif event.key == pygame.K_BACKSPACE:
+                    textbox_input = textbox_input[:len(textbox_input) - 1]
+                elif event.key == pygame.K_RETURN:
+                    if menu_state == 1 and connect_as_server:
+                        network.server_username = textbox_input
+                        network.server_begin(3535)
+                        menu_state = 4
+                        menu_labels[menu_state].append(("Your IP is " + network.server_ip, (DISPLAY_WIDTH // 2) + 20, playerlist_rect[1]))
+                        menu_buttons[menu_state].append(("Start", (DISPLAY_WIDTH // 2) + 20, playerlist_rect[1] + 30, 50, 20))
+                    elif menu_state == 1 and not connect_as_server:
+                        network.client_send_username(textbox_input)
+                    if menu_state == 2:
+                        network.client_connect(textbox_input, 3535)
+                        menu_state = 3
+                    textbox_input = ""
 
-        display_clear()
-
-        if menu_state == 0:
-            for i in range(0, len(button_rects)):
-                button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[i])
-                pygame.draw.rect(display, color_white, button_rects[i], not button_hovered)
-                if button_hovered:
-                    display.blit(button_texts_offcolor[i], button_text_coords[i])
-                else:
-                    display.blit(button_texts[i], button_text_coords[i])
-        elif menu_state == 1:
-            display.blit(ip_box_label, ip_label_coords)
-            pygame.draw.rect(display, color_white, ip_box_rect, 1)
-            ip_input_label = font_small.render(ip_box_input, False, color_white)
-            display.blit(ip_input_label, (ip_box_rect[0] + 5, ip_box_rect[1] + 2))
-        elif menu_state == 2:
-            if connection_ping_attempts != 0:
-                display.blit(connecting_label, connecting_label_coords)
-            else:
-                display.blit(connecting_timeout_label, connecting_timeout_label_coords)
-            button_hovered = point_in_rect((mouse_x, mouse_y), button_rects[1])
-            if button_hovered:
-                pygame.draw.rect(display, color_white, button_rects[1], False)
-                display.blit(cancel_label_offcolor, cancel_label_coords)
-            else:
-                pygame.draw.rect(display, color_white, button_rects[1], 1)
-                display.blit(cancel_label, cancel_label_coords)
-            if connection_ping_attempts != 0:
-                connection_ping_timer -= 1
-                if connection_ping_timer <= 0:
-                    connection_ping_attempts -= 1
-                    if connection_ping_attempts != 0:
-                        connection_ping_timer = connection_ping_delay
-                        network.client_connect(ip_box_input, 3535)
-
+        if menu_state == 3:
             if network.client_check_response():
-                menu_state = 3
-        elif menu_state == 3:
-            display.blit(username_label, ip_label_coords)
-            pygame.draw.rect(display, color_white, ip_box_rect, 1)
-            username_input_label = font_small.render(input_username, False, color_white)
-            display.blit(username_input_label, (ip_box_rect[0] + 5, ip_box_rect[1] + 2))
-            if not connect_as_server:
-                player_index = network.client_check_response()
-                if player_index != 0:
-                    local_player_index = player_index
-                    menu_state = 4
+                menu_state = 1
+        elif menu_state == 1 and not connect_as_server:
+            response = network.client_check_response()
+            if response != 0:
+                local_player_index = response
+                menu_state = 4
+                menu_labels[menu_state].append(("Waiting on host", (DISPLAY_WIDTH // 2) + 20, playerlist_rect[1]))
         elif menu_state == 4:
-            for index in range(0, len(team_box_rect)):
-                pygame.draw.rect(display, color_white, team_box_rect[index], 1)
-            for index in range(0, len(team_box_buttons)):
-                if index == 1 and not connect_as_server:
-                    break
-                button_hovered = point_in_rect((mouse_x, mouse_y), team_box_buttons[index])
-                if button_hovered:
-                    pygame.draw.rect(display, color_white, team_box_buttons[index], False)
-                    display.blit(team_box_labels_offcolor[index], team_box_label_coords[index])
-                else:
-                    pygame.draw.rect(display, color_white, team_box_buttons[index], 1)
-                    display.blit(team_box_labels[index], team_box_label_coords[index])
             if connect_as_server:
                 network.server_read()
                 player_usernames = [network.server_username] + list(network.server_client_usernames.values())
-                player_teams = [network.server_team] + list(network.server_client_userteams.values())
                 network.server_lobby_write()
             else:
-                read_data = network.client_lobby_read()
-                if read_data == "start":
-                    running = False
+                data = network.client_lobby_read()
+                if data == "start":
                     return_gamestate = GAMESTATE_GAME
-                else:
-                    if read_data != []:
-                        player_teams, player_usernames = read_data
-                    network.client_lobby_write(client_should_request_team_swap)
-                    client_should_request_team_swap = False
-            left_display_index = 1
-            right_display_index = 1
-            left_label = font_small.render("Purple Team", False, color_white)
-            display.blit(left_label, (team_box_rect[0][0] + 5, team_box_rect[0][1] + 2))
-            right_label = font_small.render("Green Team", False, color_white)
-            display.blit(right_label, (team_box_rect[1][0] + 5, team_box_rect[0][1] + 2))
-            for i in range(0, len(player_usernames)):
-                username_label = font_small.render(player_usernames[i], False, color_white)
-                if player_teams[i]:
-                    display.blit(username_label, (team_box_rect[1][0] + 5, team_box_rect[0][1] + 2 + (20 * right_display_index)))
-                    right_display_index += 1
-                else:
-                    display.blit(username_label, (team_box_rect[0][0] + 5, team_box_rect[0][1] + 2 + (20 * left_display_index)))
-                    left_display_index += 1
+                    running = False
+                elif data != []:
+                    player_usernames = data[1]
+                network.client_lobby_write()
+
+        display_clear()
+
+        for label in menu_labels[menu_state]:
+            label_texture = font_small.render(label[0], False, color_white)
+            coords = [label[1], label[2]]
+            if coords[0] == -1:
+                coords[0] = (DISPLAY_WIDTH // 2) - (label_texture.get_width() // 2)
+            if coords[1] == -1:
+                coords[1] = (DISPLAY_HEIGHT // 2) - (label_texture.get_height() // 2)
+            display.blit(label_texture, coords)
+
+        for button in menu_buttons[menu_state]:
+            button_rect = list(button[1:])
+            if button_rect[0] == -1:
+                button_rect[0] = (DISPLAY_WIDTH // 2) - (button_rect[2] // 2)
+            if button_rect[1] == -1:
+                button_rect[1] = (DISPLAY_HEIGHT // 2) - (button_rect[3] // 2)
+            button_hovered = point_in_rect((mouse_x, mouse_y), button_rect)
+            button_label_texture = None
+            if button_hovered:
+                button_label_texture = font_small.render(button[0], False, color_black)
+            else:
+                button_label_texture = font_small.render(button[0], False, color_white)
+            label_coords = [button_rect[0] + (button_rect[2] // 2) - (button_label_texture.get_width() // 2), button_rect[1] + (button_rect[3] // 2) - (button_label_texture.get_height() // 2)]
+            pygame.draw.rect(display, color_white, button_rect, not button_hovered)
+            display.blit(button_label_texture, label_coords)
+
+        if menu_textbox_type[menu_state] != 0:
+            textbox_input_label = font_small.render(textbox_input, False, color_white)
+            pygame.draw.rect(display, color_white, textbox_rect, 1)
+            display.blit(textbox_input_label, (textbox_rect[0] + 5, textbox_rect[1] + (textbox_rect[3] // 2) - (textbox_input_label.get_height() // 2)))
+
+        if menu_shows_playerlist[menu_state]:
+            pygame.draw.rect(display, color_white, playerlist_rect, 1)
+            username_render_y = playerlist_rect[1] + 5
+            for username in player_usernames:
+                username_label = font_small.render(username, False, color_white)
+                display.blit(username_label, (playerlist_rect[0] + 5, username_render_y))
+                username_render_y += username_label.get_height() + 5
 
         if show_fps:
             render_fps()

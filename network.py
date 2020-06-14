@@ -8,6 +8,7 @@ SERVER_EVENT_PLAYER_INPUT = 1
 server_game_started = False
 
 server_listener = None
+server_ip = "127.0.0.1"
 server_username = ""
 server_team = False
 server_event_queue = []
@@ -18,9 +19,8 @@ server_client_ping = {}
 
 
 def server_begin(port):
-    global server_listener 
+    global server_listener, server_ip
 
-    server_ip = "127.0.0.1"
     server_finder = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         server_finder.connect(('10.255.255.255', 1))
@@ -53,7 +53,7 @@ def server_read():
     # Read from socket and fill player buffers
     readable, writable, exceptionable = select.select([server_listener], [], [], 0.001)
     for ready_socket in readable:
-        message, address = ready_socket.recvfrom(4096)
+        message, address = ready_socket.recvfrom(256)
         message = message.decode()
         if address in list(server_client_read_buffer.keys()):
             if server_game_started:
@@ -230,11 +230,8 @@ def client_write():
         client_socket.sendto(command.encode(), client_server_address)
 
 
-def client_lobby_write(request_team_swap):
-    if request_team_swap:
-        client_socket.sendto("t\n".encode(), client_server_address)
-    else:
-        client_socket.sendto("e\n".encode(), client_server_address)
+def client_lobby_write():
+    client_socket.sendto("e\n".encode(), client_server_address)
 
 
 def client_lobby_read():
