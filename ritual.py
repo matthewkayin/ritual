@@ -1,6 +1,7 @@
 import pygame
 import sys
 import os
+import time
 import network
 import gamestate
 import animations
@@ -262,6 +263,34 @@ def game():
         gamestate.create_player()
     gamestate.player_camera_initial_position_set(local_player_index)
 
+    display_render_loadscreen("Waiting for other players...")
+    if connect_as_server:
+        patience_timeout = 30 * 1000
+        patience_before_time = pygame.time.get_ticks()
+        patience_timer = 0
+        while patience_timer < patience_timeout:
+            if network.server_check_clients_ready():
+                break
+            patience_after_time = pygame.time.get_ticks()
+            patience_timer += patience_after_time - patience_before_time
+            patience_before_time = pygame.time.get_ticks()
+        network.server_send_all_ready()
+    else:
+        patience_timeout = 60 * 1000
+        patience_before_time = pygame.time.get_ticks()
+        patience_timer = 0
+        network.client_send_ready()
+        got_server_ready = False
+        while patience_timer < patience_timeout and not got_server_ready:
+            if network.client_check_server_ready():
+                got_server_ready = True
+            time.sleep(1)
+            patience_after_time = pygame.time.get_ticks()
+            patience_timer += patience_after_time - patience_before_time
+            patience_before_time = pygame.time.get_ticks()
+        if not got_server_ready:
+            return GAMESTATE_EXIT
+
     text_death = font_big.render("You Died", False, color_red)
     text_victory = font_big.render("You Won!", False, color_green)
     game_is_over = False
@@ -364,10 +393,9 @@ def game():
                 gamestate.player_input_queue_pump_events(local_player_index)
 
                 if missed_delta != 0:
-                    gamestate.update(missed_delta)
+                    gamestate.update(missed_delta, False)
                     missed_delta = 0
             else:
-                print("missed packet")
                 append_missing_delta = True
 
         # Update gamestate

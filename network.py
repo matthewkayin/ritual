@@ -54,10 +54,9 @@ def server_read():
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
         message = message.decode()
-        if address in list(server_client_read_buffer.keys()):
+        if address in server_client_read_buffer.keys():
             if server_game_started:
                 server_client_read_buffer[address] += message
-                # server_client_ping[address] = True
             else:
                 if message.startswith("u="):
                     server_client_usernames[address] = message[message.index("=") + 1:]
@@ -84,7 +83,7 @@ def server_read():
             command = server_client_read_buffer[address][:terminator_index]
             server_client_read_buffer[address] = server_client_read_buffer[address][terminator_index + 1:]
 
-            if command == "e":
+            if command == "e" or command == "r":
                 continue
 
             if int(command[0]) == 1:
@@ -153,6 +152,24 @@ def server_lobby_write():
         if server_client_ping[address]:
             server_listener.sendto(usernames_string.encode(), address)
             server_client_ping[address] = False
+
+
+def server_check_clients_ready():
+    readable, writable, exceptionable = select.select([server_listener], [], [], 0.001)
+    for ready_socket in readable:
+        message, address = ready_socket.recvfrom(1024)
+        message = message.decode()
+        if address in server_client_read_buffer.keys():
+            if message == "r\n":
+                server_client_ping[address] = True
+
+    return not (False in server_client_ping.values())
+
+
+def server_send_all_ready():
+    for address in server_client_read_buffer.keys():
+        server_client_ping[address] = False
+        server_listener.sendto("r\n".encode(), address)
 
 
 client_socket = None
@@ -268,3 +285,18 @@ def client_lobby_read():
         return player_usernames
 
     return []
+
+
+def client_send_ready():
+    client_socket.sendto("r\n".encode(), client_server_address)
+
+
+def client_check_server_ready():
+    readable, writable, exceptionable = select.select([client_socket], [], [], 0.001)
+    for ready_socket in readable:
+        message, address = ready_socket.recvfrom(1024)
+        message = message.decode()
+        if message == "r\n":
+            return True
+
+    return False

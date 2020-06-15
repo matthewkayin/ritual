@@ -82,7 +82,7 @@ def map_load(map_image, map_alpha):
                 new_collider_x = x
                 new_collider_y = y
                 # first, cycle points until we get width
-                current_x = x 
+                current_x = x
                 current_y = y
                 while current_x < map_alpha.get_width() and map_alpha.get_at((current_x, current_y)) == (0, 0, 0) and True not in [point_in_rect((current_x, current_y), collider) for collider in map_colliders]:
                     current_x += 1
@@ -323,7 +323,7 @@ def player_input_queue_pump_events(player_index=-1):
             player_input_handle(player_index, input_event)
 
 
-def update(delta):
+def update(delta, update_animations=True):
     for player_index in range(0, player_count_get()):
         if player_health[player_index] <= 0:
             continue
@@ -384,63 +384,65 @@ def update(delta):
             if player_teleport_cooldown_timer[player_index] < 0:
                 player_teleport_cooldown_timer[player_index] = 0
 
-        # Update player animations
-        if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
-            player_animation_flipped[player_index] = False
-        elif not player_animation_flipped[player_index] and player_velocity[player_index][0] < 0:
-            player_animation_flipped[player_index] = True
-
+        # Update player hurt frames
         if player_hurt_timer[player_index] != 0:
             player_hurt_timer[player_index] -= delta
             if player_hurt_timer[player_index] <= 0:
                 player_hurt_timer[player_index] = 0
                 player_velocity[player_index] = [0, 0]
 
-        desired_animation_state = 0
-        if player_hurt_timer[player_index] > 0:
-            desired_animation_state = -1
-        elif player_teleport_dest[player_index] is not None:
-            desired_animation_state = 4
-        else:
-            if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
-                if player_pending_spells[player_index] is None:
-                    desired_animation_state = 1
-                else:
-                    desired_animation_state = 2
+        # Update player animations
+        if update_animations:
+            if player_animation_flipped[player_index] and player_velocity[player_index][0] > 0:
+                player_animation_flipped[player_index] = False
+            elif not player_animation_flipped[player_index] and player_velocity[player_index][0] < 0:
+                player_animation_flipped[player_index] = True
+
+            desired_animation_state = 0
+            if player_hurt_timer[player_index] > 0:
+                desired_animation_state = -1
+            elif player_teleport_dest[player_index] is not None:
+                desired_animation_state = 4
             else:
-                if player_animation_state[player_index] == 3:
-                    if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
-                        desired_animation_state = 0
+                if player_velocity[player_index][0] != 0 or player_velocity[player_index][1] != 0:
+                    if player_pending_spells[player_index] is None:
+                        desired_animation_state = 1
                     else:
+                        desired_animation_state = 2
+                else:
+                    if player_animation_state[player_index] == 3:
+                        if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
+                            desired_animation_state = 0
+                        else:
+                            desired_animation_state = 3
+                    elif player_animation_windup[player_index] or player_animation_state[player_index] == 3:
                         desired_animation_state = 3
-                elif player_animation_windup[player_index] or player_animation_state[player_index] == 3:
-                    desired_animation_state = 3
 
-        if desired_animation_state != -1:
-            current_animation_state = player_animation_state[player_index]
-            if current_animation_state != desired_animation_state:
-                animations.instance_reset(player_animations[player_index][current_animation_state])
-                player_animation_state[player_index] = desired_animation_state
-            animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
+            if desired_animation_state != -1:
+                current_animation_state = player_animation_state[player_index]
+                if current_animation_state != desired_animation_state:
+                    animations.instance_reset(player_animations[player_index][current_animation_state])
+                    player_animation_state[player_index] = desired_animation_state
+                animations.instance_update(player_animations[player_index][player_animation_state[player_index]], delta)
 
-        if player_animation_windup[player_index]:
-            if animations.instance_cast_animation_ready(player_animations[player_index][player_animation_state[player_index]]):
-                player_spell_cast(player_index, player_pending_spell_aim[player_index])
-                player_animation_windup[player_index] = False
-                player_velocity_update(player_index)
+            if player_animation_windup[player_index]:
+                if animations.instance_cast_animation_ready(player_animations[player_index][player_animation_state[player_index]]):
+                    player_spell_cast(player_index, player_pending_spell_aim[player_index])
+                    player_animation_windup[player_index] = False
+                    player_velocity_update(player_index)
 
-        if player_teleport_dest[player_index] is not None:
-            if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
-                player_position[player_index][0] = player_teleport_dest[player_index][0]
-                player_position[player_index][1] = player_teleport_dest[player_index][1]
-                player_teleport_dest[player_index] = None
-                player_teleport_cooldown_timer[player_index] = PLAYER_TELEPORT_COOLDOWN
-                player_velocity_update(player_index)
+            if player_teleport_dest[player_index] is not None:
+                if animations.instance_finished(player_animations[player_index][player_animation_state[player_index]]):
+                    player_position[player_index][0] = player_teleport_dest[player_index][0]
+                    player_position[player_index][1] = player_teleport_dest[player_index][1]
+                    player_teleport_dest[player_index] = None
+                    player_teleport_cooldown_timer[player_index] = PLAYER_TELEPORT_COOLDOWN
+                    player_velocity_update(player_index)
 
-        # Player display health sliding
-        if player_display_health[player_index] != player_health[player_index]:
-            health_decreasing = player_display_health[player_index] > player_health[player_index]
-            player_display_health[player_index] += 3 * delta * (-1 * health_decreasing)
+            # Player display health sliding
+            if player_display_health[player_index] != player_health[player_index]:
+                health_decreasing = player_display_health[player_index] > player_health[player_index]
+                player_display_health[player_index] += 3 * delta * (-1 * health_decreasing)
 
     # Update spells
     spell_indexes_deleted_this_frame = []
@@ -569,7 +571,7 @@ def state_data_get():
 
 
 def state_data_set(state_data):
-    global spell_instances 
+    global spell_instances
 
     player_data = state_data[0]
     for player_index in range(0, len(player_data)):
