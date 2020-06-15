@@ -10,11 +10,10 @@ server_game_started = False
 server_listener = None
 server_ip = "127.0.0.1"
 server_username = ""
-server_team = False
 server_event_queue = []
 server_client_read_buffer = {}
 server_client_usernames = {}
-server_client_userteams = {}
+server_client_inputs_received = {}
 server_client_ping = {}
 
 
@@ -53,16 +52,14 @@ def server_read():
     # Read from socket and fill player buffers
     readable, writable, exceptionable = select.select([server_listener], [], [], 0.001)
     for ready_socket in readable:
-        message, address = ready_socket.recvfrom(256)
+        message, address = ready_socket.recvfrom(1024)
         message = message.decode()
         if address in list(server_client_read_buffer.keys()):
             if server_game_started:
                 server_client_read_buffer[address] += message
-                server_client_ping[address] = True
+                # server_client_ping[address] = True
             else:
-                if message == "t\n":
-                    server_client_userteams[address] = not server_client_userteams[address]
-                elif message.startswith("u="):
+                if message.startswith("u="):
                     server_client_usernames[address] = message[message.index("=") + 1:]
                 server_client_ping[address] = True
         else:
@@ -75,9 +72,9 @@ def server_read():
                 response = "welc" + str(next_player_index) + "\n"
                 server_listener.sendto(response.encode(), address)
                 server_client_usernames[address] = message[message.index("=") + 1:]
-                server_client_userteams[address] = False
+                server_client_inputs_received[address] = 0
                 server_client_read_buffer[address] = ""
-                server_client_ping[address] = True
+                server_client_ping[address] = False
 
     # Read from player buffers
     current_player_index = 1
@@ -90,12 +87,22 @@ def server_read():
             if command == "e":
                 continue
 
-            command_items = command.split(",")
-            if len(command_items) == 2:
-                command_items = [int(part) for part in command_items]
-            else:
-                command_items = [int(command_items[0]), int(command_items[1]), (int(command_items[2]), int(command_items[3]))]
-            server_event_queue.append([SERVER_EVENT_PLAYER_INPUT, current_player_index, command_items])
+            if int(command[0]) == 1:
+                server_client_ping[address] = True
+            command = command[command.index("#") + 1:]
+
+            if len(command) == 0:
+                continue
+
+            command_inputs = command.split("&")
+            for command_input in command_inputs:
+                input_items = command_input.split(",")
+                if len(input_items) == 2:
+                    input_items = [int(part) for part in input_items]
+                else:
+                    input_items = [int(input_items[0]), int(input_items[1]), (int(input_items[2]), int(input_items[3]))]
+                server_event_queue.append([SERVER_EVENT_PLAYER_INPUT, current_player_index, input_items])
+                server_client_inputs_received[address] += 1
         current_player_index += 1
 
 
@@ -130,14 +137,16 @@ def server_write(state_data):
 
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
-            server_listener.sendto(state_string.encode(), address)
+            out_string = str(server_client_inputs_received[address]) + "#" + state_string
+            server_client_inputs_received[address] = 0
+            server_listener.sendto(out_string.encode(), address)
             server_client_ping[address] = False
 
 
 def server_lobby_write():
-    usernames_string = "u=" + str(int(server_team)) + server_username
+    usernames_string = "u=" + server_username
     for address in server_client_read_buffer.keys():
-        usernames_string += "," + str(int(server_client_userteams[address])) + server_client_usernames[address]
+        usernames_string += "," + server_client_usernames[address]
     usernames_string += "\n"
 
     for address in server_client_read_buffer.keys():
@@ -151,7 +160,7 @@ client_server_address = None
 client_connected = False
 client_server_buffer = ""
 client_event_queue = []
-client_received_packets = 0
+client_received_inputs = 0
 
 
 def client_connect(server_ip, server_port):
@@ -181,17 +190,16 @@ def client_send_username(username):
 
 
 def client_read():
-    global client_socket, client_connected, client_server_buffer, client_received_packets
+    global client_socket, client_connected, client_server_buffer, client_received_inputs
 
     return_data = []
 
     readable, writable, exceptionalbe = select.select([client_socket], [], [], 0.001)
     for ready_socket in readable:
-        message, address = ready_socket.recvfrom(4096)
+        message, address = ready_socket.recvfrom(1024)
         client_server_buffer += message.decode()
 
     while "\n" in client_server_buffer:
-        client_received_packets += 1
         terminator_index = client_server_buffer.index("\n")
         command = client_server_buffer[:terminator_index]
         client_server_buffer = client_server_buffer[terminator_index + 1:]
@@ -199,6 +207,9 @@ def client_read():
         if command.startswith("u="):
             continue
         else:
+            client_received_inputs += int(command[:command.index("#")])
+            command = command[command.index("#") + 1:]
+
             return_data_entry = []
             return_data_entry.append("set_state")
 
@@ -214,11 +225,10 @@ def client_read():
     return return_data
 
 
-def client_write():
+def client_write(ping_server):
     global client_socket, client_server_address, client_event_queue
 
-    if len(client_event_queue) == 0:
-        client_socket.sendto("e\n".encode(), client_server_address)
+    command = str(int(ping_server)) + "#"
     while len(client_event_queue) != 0:
         client_event = client_event_queue.pop(0)
 
@@ -226,8 +236,12 @@ def client_write():
         if len(client_event) > 2:
             mouse_pos_string = "," + str(client_event[2][0]) + "," + str(client_event[2][1])
 
-        command = str(int(client_event[0])) + "," + str(client_event[1]) + mouse_pos_string + "\n"
-        client_socket.sendto(command.encode(), client_server_address)
+        if "," in command:
+            command += "&"
+        command += str(int(client_event[0])) + "," + str(client_event[1]) + mouse_pos_string
+    command += "\n"
+
+    client_socket.sendto(command.encode(), client_server_address)
 
 
 def client_lobby_write():
@@ -250,9 +264,7 @@ def client_lobby_read():
     if "\n" in client_server_buffer:
         message = client_server_buffer[message.index("=") + 1:message.index("\n")]
         client_server_buffer = client_server_buffer[client_server_buffer.index("\n") + 1:]
-        player_strings = message.split(",")
-        player_teams = [bool(int(part[0])) for part in player_strings]
-        player_usernames = [part[1:] for part in player_strings]
-        return player_teams, player_usernames
+        player_usernames = message.split(",")
+        return player_usernames
 
     return []
