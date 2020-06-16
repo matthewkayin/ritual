@@ -135,7 +135,7 @@ def create_player():
     player_pending_spell_aim.append([0, 0])
     player_equipped_spells.append([0, -1, -1, -1])
     player_selected_spell.append(0)
-    player_spell_cooldown_timers.append([-1, -1, -1, -1])
+    player_spell_cooldown_timers.append([0, 0, 0, 0])
 
 
 def reset_players():
@@ -183,7 +183,7 @@ def player_input_handle(player_index, input_event):
             update_player_velocity = True
         elif input_event_name == INPUT_SPELLCAST:
             spell_name = player_equipped_spells[player_index][player_selected_spell[player_index]]
-            if player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] == -1:
+            if player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] == 0:
                 new_spell_instance = spells.instance_create(spell_name)
                 player_pending_spells[player_index] = new_spell_instance
                 if spells.instance_can_instant_cast(new_spell_instance):
@@ -285,7 +285,7 @@ def player_spell_cast(player_index, mouse_pos):
             return
     spell_instances.append(spell_instance)
     player_pending_spells[player_index] = None
-    player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] = 0
+    player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] = spells.spell_cooldown_time[spell_instance[0]]
 
 
 def player_velocity_update(player_index):
@@ -372,11 +372,10 @@ def update(delta, update_animations=True):
 
         # Update spell cooldown timers
         for i in range(0, 4):
-            if player_spell_cooldown_timers[player_index][i] != -1:
-                player_spell_cooldown_timers[player_index][i] += delta
-                spell_name = player_equipped_spells[player_index][i]
-                if player_spell_cooldown_timers[player_index][i] >= spells.spell_cooldown_time[spell_name]:
-                    player_spell_cooldown_timers[player_index][i] = -1
+            if player_spell_cooldown_timers[player_index][i] != 0:
+                player_spell_cooldown_timers[player_index][i] -= delta
+                if player_spell_cooldown_timers[player_index][i] < 0:
+                    player_spell_cooldown_timers[player_index][i] = 0
 
         # Update teleport cooldown timer
         if player_teleport_cooldown_timer[player_index] != 0:
@@ -686,11 +685,8 @@ def player_health_percentage_get(player_index):
 def player_cooldown_percents_get(player_index):
     percents = []
     for i in range(0, len(player_spell_cooldown_timers[player_index])):
-        if player_spell_cooldown_timers[player_index][i] == -1:
-            percents.append(None)
-        else:
-            spell_name = player_equipped_spells[player_index][i]
-            percents.append(player_spell_cooldown_timers[player_index][i] / spells.spell_cooldown_time[spell_name])
+        spell_name = player_equipped_spells[player_index][i]
+        percents.append(player_spell_cooldown_timers[player_index][i] / spells.spell_cooldown_time[spell_name])
     return percents
 
 

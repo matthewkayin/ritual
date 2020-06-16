@@ -470,7 +470,7 @@ def game():
             empty_height = int(heart_height * (1 - player_health))
             display.blit(animations.image_health_empty.subsurface(0, 0, heart_width, empty_height), (0, 0))
             display.blit(animations.image_health_full.subsurface(0, empty_height, heart_width, heart_height - empty_height), (0, empty_height))
-        display.blit(animations.image_toolbar, (0, 0))
+
         player_charge_percent = gamestate.player_spell_charge_percentage_get(local_player_index)
         if player_charge_percent == 1:
             display.blit(animations.image_chargebar_full, (0, 0))
@@ -482,11 +482,13 @@ def game():
             full_width = int(charge_width * player_charge_percent)
             display.blit(animations.image_chargebar_full.subsurface(0, 0, full_width, charge_height), (0, 0))
             display.blit(animations.image_chargebar_empty.subsurface(full_width, 0, charge_width - full_width, charge_height), (full_width, 0))
+
+        display.blit(animations.image_toolbar, (0, 0))
         player_cooldown_timers = gamestate.player_cooldown_percents_get(local_player_index)
-        if player_cooldown_timers[0] is None:
+        if player_cooldown_timers[0] == 0:
             pygame.draw.rect(display, color_yellow, (38, 7, 20, 20), False)
         else:
-            pygame.draw.rect(display, color_red, (38, 7 + int(20 * (1 - player_cooldown_timers[0])), 20, int(20 * player_cooldown_timers[0])), False)
+            pygame.draw.rect(display, color_red, (38, 7 + int(20 * player_cooldown_timers[0]), 20, int(20 * (1 - player_cooldown_timers[0]))), False)
         player_teleport_cooldown = gamestate.player_teleport_cooldown_percent_get(local_player_index)
         if player_teleport_cooldown is None:
             pygame.draw.rect(display, color_yellow, (61, 7, 20, 20), False)
