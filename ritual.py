@@ -559,5 +559,4 @@ if __name__ == "__main__":
             current_gamestate = menu()
         elif current_gamestate == GAMESTATE_GAME:
             current_gamestate = game()
-    network.network_log.close()
     pygame.quit()
