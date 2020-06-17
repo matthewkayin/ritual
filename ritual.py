@@ -249,6 +249,7 @@ def game():
 
     running = True
     return_gamestate = GAMESTATE_EXIT
+    gamestate.local_player_index = local_player_index
 
     display_render_loadscreen("Loading animations...")
     animations.load_all()
@@ -303,6 +304,10 @@ def game():
     missed_delta = 0
     append_missing_delta = False
     input_cache = []
+
+    # first flush out any input given during the loading screen
+    for event in pygame.event.get():
+        continue
 
     while running:
         # Input

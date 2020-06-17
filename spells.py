@@ -27,6 +27,7 @@ def spell_define(name, charge_type, charge_time, cooldown_time, time_to_live, si
 
 
 def spell_define_all():
+    # Note to future self! If you make a spell charge timer that is too long you'll need to give another byte to the timer on the network packet
     spell_define(SPELL_MAGIC_MISSILE, CHARGE_PARTIAL_CAST, 1.0, 1.0, 1.5, (10, 10), 3, 40)
 
 

@@ -2,6 +2,8 @@ import math
 import animations
 import spells
 
+local_player_index = 0
+
 # Input Names
 INPUT_UP = 0
 INPUT_DOWN = 1
@@ -183,7 +185,7 @@ def player_input_handle(player_index, input_event):
             update_player_velocity = True
         elif input_event_name == INPUT_SPELLCAST:
             spell_name = player_equipped_spells[player_index][player_selected_spell[player_index]]
-            if player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] == 0:
+            if player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] == 0 or player_index != local_player_index:
                 new_spell_instance = spells.instance_create(spell_name)
                 player_pending_spells[player_index] = new_spell_instance
                 if spells.instance_can_instant_cast(new_spell_instance):
@@ -327,7 +329,7 @@ def update(delta, update_animations=True):
     for player_index in range(0, player_count_get()):
         if player_health[player_index] <= 0:
             continue
-        player_input_queue_pump_events()
+        player_input_queue_pump_events(player_index)
 
         # Update player position
         player_position[player_index][0] += player_velocity[player_index][0] * delta
@@ -531,8 +533,6 @@ def state_data_get():
         player_data_entry.append(round(player_velocity[player_index][1], 2))
         player_data_entry.append(int(player_health[player_index]))
         player_data_entry.append(int(player_hurt_timer[player_index]))
-        for timer_value in player_spell_cooldown_timers[player_index]:
-            player_data_entry.append(int(timer_value))
         if player_teleport_dest[player_index] is not None:
             player_data_entry.append(int(player_teleport_dest[player_index][0]))
             player_data_entry.append(int(player_teleport_dest[player_index][1]))
@@ -582,13 +582,11 @@ def state_data_set(state_data):
         player_velocity[player_index][1] = float(player_data[player_index][3])
         player_health[player_index] = int(player_data[player_index][4])
         player_hurt_timer[player_index] = int(player_data[player_index][5])
-        for i in range(0, len(player_spell_cooldown_timers[player_index])):
-            player_spell_cooldown_timers[player_index][i] = int(player_data[player_index][6 + i])
-        if len(player_data[player_index]) == 12:
-            player_teleport_dest[player_index] = [int(player_data[player_index][10]), int(player_data[player_index][11])]
+        if len(player_data[player_index]) == 8:
+            player_teleport_dest[player_index] = [int(player_data[player_index][6]), int(player_data[player_index][7])]
         else:
             player_teleport_dest[player_index] = None
-            player_teleport_cooldown_timer[player_index] = int(player_data[player_index][10])
+            player_teleport_cooldown_timer[player_index] = int(player_data[player_index][6])
 
     spell_data = state_data[1]
     spell_instances = []
