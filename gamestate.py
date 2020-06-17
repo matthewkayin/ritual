@@ -466,6 +466,7 @@ def update(delta, update_animations=True):
                         old_spell_velocity[0] *= -1
                     elif collision_direction[1] != 0:
                         old_spell_velocity[1] *= -1
+                    spells.instance_position_set(spell_instances[spell_index], [spell_rect[0], spell_rect[1]])
                     spells.instance_velocity_set(spell_instances[spell_index], old_spell_velocity)
                     break
             spell_rect = spells.instance_rect_get(spell_instances[spell_index])
@@ -482,6 +483,7 @@ def update(delta, update_animations=True):
                     player_animation_state[player_index] = 0
                     spell_instances[spell_index][0] = spells.SPELL_DELETE_ME
                     spell_indexes_deleted_this_frame.append(spell_index)
+                    break
 
     for index in spell_indexes_deleted_this_frame:
         del spell_instances[index]
