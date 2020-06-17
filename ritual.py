@@ -7,6 +7,7 @@ import gamestate
 import animations
 import spells
 
+
 # Handle cli flags
 windowed = "--windowed" in sys.argv
 show_fps = "--showfps" in sys.argv
@@ -302,6 +303,7 @@ def game():
     last_pings = []
 
     missed_delta = 0
+    missed_packets = 0
     append_missing_delta = False
     input_cache = []
 
@@ -401,6 +403,7 @@ def game():
                     missed_delta = 0
             else:
                 append_missing_delta = True
+                missed_packets += 1
 
         # Update gamestate
         delta = (pygame.time.get_ticks() - before_time) / UPDATE_TIME
@@ -426,6 +429,13 @@ def game():
                 ping_before_time = pygame.time.get_ticks()
                 pinging = True
                 network.client_write(pinging)
+            else:
+                if missed_packets > 9:
+                    # Assume our packet got lost to the server
+                    for input_event in input_cache:
+                        network.client_event_queue.append(input_event)
+                    missed_packets = 0
+                    network.client_write(pinging)
 
         display_clear()
 
@@ -549,4 +559,5 @@ if __name__ == "__main__":
             current_gamestate = menu()
         elif current_gamestate == GAMESTATE_GAME:
             current_gamestate = game()
+    network.network_log.close()
     pygame.quit()

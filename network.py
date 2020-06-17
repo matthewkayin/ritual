@@ -2,6 +2,9 @@ import socket
 import select
 
 
+network_log = open("network_log.txt", "w")
+
+
 SERVER_EVENT_NEW_PLAYER = 0
 SERVER_EVENT_PLAYER_INPUT = 1
 
@@ -18,7 +21,7 @@ server_client_ping = {}
 
 
 def server_begin(port):
-    global server_listener, server_ip
+    global server_listener, server_ip 
 
     server_finder = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -53,6 +56,7 @@ def server_read():
     readable, writable, exceptionable = select.select([server_listener], [], [], 0.001)
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
+        network_log.write(str(address) + ": " + str(message) + " \n")
         message = message.decode()
         if address in server_client_read_buffer.keys():
             if server_game_started:
@@ -190,6 +194,7 @@ def client_read():
     readable, writable, exceptionalbe = select.select([client_socket], [], [], 0.001)
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
+        network_log.write((address) + ": " + str(message) + " \n")
         client_server_buffer += message
 
     while len(client_server_buffer) != 0:
