@@ -108,37 +108,13 @@ def server_read():
 def server_write(state_data):
     global server_listener, server_client_read_buffer
 
-    state_string = ""
-    for player in state_data[0]:
-        if state_string != "":
-            state_string += "&"
-        player_string = ""
-        for value in player:
-            if player_string != "":
-                player_string += ","
-            player_string += str(value)
-        state_string += player_string
-
-    state_string += "|"
-    spell_string = ""
-    for spell in state_data[1]:
-        if spell_string != "":
-            spell_string += "&"
-        instance_string = ""
-        for value in spell:
-            if instance_string != "":
-                instance_string += ","
-            instance_string += str(value)
-        spell_string += instance_string
-    state_string += spell_string
-
-    state_string += "\n"
+    packet_length = 3 + len(state_data)
 
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
-            out_string = str(server_client_inputs_received[address]) + "#" + state_string
+            out_string = int(packet_length).to_bytes(2, "little", signed=False) + int(server_client_inputs_received[address]).to_bytes(1, "little", signed=False) + state_data
             server_client_inputs_received[address] = 0
-            server_listener.sendto(out_string.encode(), address)
+            server_listener.sendto(out_string, address)
             server_client_ping[address] = False
 
 
@@ -214,30 +190,19 @@ def client_read():
     readable, writable, exceptionalbe = select.select([client_socket], [], [], 0.001)
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
-        client_server_buffer += message.decode()
+        client_server_buffer += message
 
-    while "\n" in client_server_buffer:
-        terminator_index = client_server_buffer.index("\n")
-        command = client_server_buffer[:terminator_index]
-        client_server_buffer = client_server_buffer[terminator_index + 1:]
+    while len(client_server_buffer) != 0:
+        next_packet_header = client_server_buffer[0:2]
+        next_packet_length = int.from_bytes(next_packet_header, "little", signed=False)
+        if len(client_server_buffer) < next_packet_length:
+            break
 
-        if command.startswith("u="):
-            continue
-        else:
-            client_received_inputs += int(command[:command.index("#")])
-            command = command[command.index("#") + 1:]
+        next_packet = client_server_buffer[2:next_packet_length]
+        client_server_buffer = client_server_buffer[next_packet_length:]
 
-            return_data_entry = []
-            return_data_entry.append("set_state")
-
-            sections = [part.split("&") for part in command.split("|")]
-            for section in sections:
-                section_entry = []
-                for part in section:
-                    section_entry.append(part.split(","))
-                return_data_entry.append(section_entry)
-
-            return_data.append(return_data_entry)
+        client_received_inputs += int.from_bytes(next_packet[0:1], "little", signed=False)
+        return_data.append(next_packet[1:])
 
     return return_data
 
@@ -292,11 +257,15 @@ def client_send_ready():
 
 
 def client_check_server_ready():
+    global client_server_buffer
+
     readable, writable, exceptionable = select.select([client_socket], [], [], 0.001)
     for ready_socket in readable:
         message, address = ready_socket.recvfrom(1024)
         message = message.decode()
         if message == "r\n":
+            # now that we're receiving state data we'll want to switch the data type of the buffer
+            client_server_buffer = "".encode()
             return True
 
     return False

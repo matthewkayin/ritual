@@ -481,6 +481,7 @@ def update(delta, update_animations=True):
                     animations.instance_reset(player_animations[player_index][player_animation_state[player_index]])
                     player_animation_state[player_index] = 0
                     spell_instances[spell_index][0] = spells.SPELL_DELETE_ME
+                    spell_indexes_deleted_this_frame.append(spell_index)
 
     for index in spell_indexes_deleted_this_frame:
         del spell_instances[index]
@@ -521,50 +522,50 @@ def gameover_timer_update(player_index, delta):
 
 
 def state_data_get():
-    state_data = []
+    # start with an empty byte string
+    state_data = "".encode()
 
-    player_data = []
+    # build teleport flags byte
+    teleport_flags_as_int = 0
     for player_index in range(0, player_count_get()):
-        player_data_entry = []
-
-        player_data_entry.append(int(player_position[player_index][0]))
-        player_data_entry.append(int(player_position[player_index][1]))
-        player_data_entry.append(round(player_velocity[player_index][0], 2))
-        player_data_entry.append(round(player_velocity[player_index][1], 2))
-        player_data_entry.append(int(player_health[player_index]))
-        player_data_entry.append(int(player_hurt_timer[player_index]))
         if player_teleport_dest[player_index] is not None:
-            player_data_entry.append(int(player_teleport_dest[player_index][0]))
-            player_data_entry.append(int(player_teleport_dest[player_index][1]))
-        else:
-            player_data_entry.append(int(player_teleport_cooldown_timer[player_index]))
+            teleport_flags_as_int += 2 ** (7 - player_index)
+    state_data += int(teleport_flags_as_int).to_bytes(1, "little", signed=False)
 
-        player_data.append(player_data_entry)
-    state_data.append(player_data)
-
-    spell_data = []
     for player_index in range(0, player_count_get()):
-        if player_pending_spells[player_index] is not None:
-            spell_data_entry = []
+        player_packet = "".encode()
 
-            spell_data_entry.append(int(player_index))
-            spell_data_entry.append(int(player_pending_spells[player_index][0]))
-            spell_data_entry.append(int(player_pending_spells[player_index][1]))
-            spell_data_entry.append(int(player_animation_windup[player_index]))
+        player_packet += int(player_position[player_index][0]).to_bytes(2, "little", signed=True)
+        player_packet += int(player_position[player_index][1]).to_bytes(2, "little", signed=True)
+        player_packet += int(round(player_velocity[player_index][0], 2) * 100).to_bytes(2, "little", signed=True)
+        player_packet += int(round(player_velocity[player_index][1], 2) * 100).to_bytes(2, "little", signed=True)
+        player_packet += int(player_health[player_index]).to_bytes(1, "little", signed=False)
+        player_packet += int(player_hurt_timer[player_index]).to_bytes(1, "little", signed=False)
+        player_packet += int(player_selected_spell[player_index]).to_bytes(1, "little", signed=False)
+        # For the player spell timer, we send 0 if no pending spell and shift the value of the timer by 1 when there is a spell
+        # This way we can tell if there's a pending spell without creating another byte or bit somewhere, but we have to remember
+        # shift values down by 1 again when we read the packet on the client side
+        if player_pending_spells[player_index] is None:
+            player_packet += int(0).to_bytes(1, "little", signed=False)
+        else:
+            player_packet += int(player_pending_spells[player_index][1] + 1).to_bytes(1, "little", signed=False)
+        if player_teleport_dest[player_index] is not None:
+            player_packet += int(player_teleport_dest[player_index][0]).to_bytes(2, "little", signed=True)
+            player_packet += int(player_teleport_dest[player_index][1]).to_bytes(2, "little", signed=True)
 
-            spell_data.append(spell_data_entry)
+        state_data += player_packet
+
     for spell_index in range(0, spell_count_get()):
-        spell_data_entry = []
+        spell_packet = "".encode()
 
-        spell_data_entry.append(int(spell_instances[spell_index][0]))
-        spell_data_entry.append(int(spell_instances[spell_index][1]))
-        spell_data_entry.append(int(spell_instances[spell_index][2]))
-        spell_data_entry.append(int(spell_instances[spell_index][3]))
-        spell_data_entry.append(round(spell_instances[spell_index][4], 2))
-        spell_data_entry.append(round(spell_instances[spell_index][5], 2))
+        spell_packet += int(spell_instances[spell_index][0]).to_bytes(1, "little", signed=False)
+        spell_packet += int(spell_instances[spell_index][1]).to_bytes(2, "little", signed=False)
+        spell_packet += int(spell_instances[spell_index][2]).to_bytes(2, "little", signed=True)
+        spell_packet += int(spell_instances[spell_index][3]).to_bytes(2, "little", signed=True)
+        spell_packet += int(round(spell_instances[spell_index][4], 2) * 100).to_bytes(2, "little", signed=True)
+        spell_packet += int(round(spell_instances[spell_index][5], 2) * 100).to_bytes(2, "little", signed=True)
 
-        spell_data.append(spell_data_entry)
-    state_data.append(spell_data)
+        state_data += spell_packet
 
     return state_data
 
@@ -572,50 +573,58 @@ def state_data_get():
 def state_data_set(state_data):
     global spell_instances
 
-    player_data = state_data[0]
-    for player_index in range(0, len(player_data)):
-        if player_index == player_count_get():
-            create_player()
-        player_position[player_index][0] = int(player_data[player_index][0])
-        player_position[player_index][1] = int(player_data[player_index][1])
-        player_velocity[player_index][0] = float(player_data[player_index][2])
-        player_velocity[player_index][1] = float(player_data[player_index][3])
-        player_health[player_index] = int(player_data[player_index][4])
-        player_hurt_timer[player_index] = int(player_data[player_index][5])
-        if len(player_data[player_index]) == 8:
-            player_teleport_dest[player_index] = [int(player_data[player_index][6]), int(player_data[player_index][7])]
+    teleport_flags = state_data[0:1]
+    teleport_flags_as_int = int.from_bytes(teleport_flags, "little", signed=False)
+    players_teleporting = []
+    for player_index in range(0, player_count_get()):
+        if teleport_flags_as_int >= 2 ** (7 - player_index):
+            players_teleporting.append(True)
+            teleport_flags_as_int -= 2 ** (7 - player_index)
+        else:
+            players_teleporting.append(False)
+    state_data = state_data[1:]
+
+    for player_index in range(0, player_count_get()):
+        player_packet = state_data[:12]
+        state_data = state_data[12:]
+
+        player_position[player_index][0] = int.from_bytes(player_packet[0:2], "little", signed=True)
+        player_position[player_index][1] = int.from_bytes(player_packet[2:4], "little", signed=True)
+        player_velocity[player_index][0] = float(int.from_bytes(player_packet[4:6], "little", signed=True)) / 100
+        player_velocity[player_index][1] = float(int.from_bytes(player_packet[6:8], "little", signed=True)) / 100
+        player_health[player_index] = int.from_bytes(player_packet[8:9], "little", signed=False)
+        player_hurt_timer[player_index] = int.from_bytes(player_packet[9:10], "little", signed=False)
+        player_selected_spell[player_index] = int.from_bytes(player_packet[10:11], "little", signed=False)
+        timer_value = int.from_bytes(player_packet[11:12], "little", signed=False)
+        if timer_value == 0:
+            player_pending_spells[player_index] = None
+            if player_animation_windup[player_index]:
+                player_animation_windup[player_index] = False
+        else:
+            player_pending_spells[player_index] = spells.instance_create(player_selected_spell[player_index])
+            player_pending_spells[player_index][1] = timer_value - 1
+
+        if players_teleporting[player_index]:
+            player_teleport_packet = state_data[:4]
+            state_data = state_data[4:]
+
+            player_teleport_dest[player_index] = [int.from_bytes(player_teleport_packet[0:2], "little", signed=True), int.from_bytes(player_teleport_packet[2:4], "little", signed=True)]
         else:
             player_teleport_dest[player_index] = None
-            player_teleport_cooldown_timer[player_index] = int(player_data[player_index][6])
 
-    spell_data = state_data[1]
     spell_instances = []
-    for player_index in range(0, len(player_data)):
-        player_pending_spells[player_index] = None
-    # This if statement happens when there is no spell data, we set the array to empty to skip this whole section
-    if spell_data[0] == [""]:
-        spell_data = []
-    instance_index = 0
-    for spell_index in range(0, len(spell_data)):
-        if len(spell_data[spell_index]) == 4:
-            player_index = int(spell_data[spell_index][0])
-            player_pending_spells[player_index] = spells.instance_create(int(spell_data[spell_index][1]))
-            spells.instance_timer_set(player_pending_spells[player_index], int(spell_data[spell_index][2]))
-            player_animation_windup[player_index] = bool(int(spell_data[spell_index][3]))
-        else:
-            spell_instances.append(spells.instance_create(int(spell_data[spell_index][0])))
-            spell_values = []
-            spell_values.append(int(spell_data[spell_index][1]))
-            spell_values.append(int(spell_data[spell_index][2]))
-            spell_values.append(int(spell_data[spell_index][3]))
-            spell_values.append(float(spell_data[spell_index][4]))
-            spell_values.append(float(spell_data[spell_index][5]))
-            spells.instance_values_set(spell_instances[instance_index], spell_values)
-            instance_index += 1
 
-    for player_index in range(0, len(state_data)):
-        if player_animation_windup[player_index] and player_pending_spells[player_index] is None:
-            player_animation_windup[player_index] = False
+    while len(state_data) != 0:
+        spell_packet = state_data[:11]
+        state_data = state_data[11:]
+
+        spell_instances.append(spells.instance_create(int.from_bytes(spell_packet[0:1], "little", signed=False)))
+        spell_index = len(spell_instances) - 1
+        spell_instances[spell_index][1] = int.from_bytes(spell_packet[1:3], "little", signed=False)
+        spell_instances[spell_index][2] = int.from_bytes(spell_packet[3:5], "little", signed=True)
+        spell_instances[spell_index][3] = int.from_bytes(spell_packet[5:7], "little", signed=True)
+        spell_instances[spell_index][4] = float(int.from_bytes(spell_packet[7:9], "little", signed=True)) / 100
+        spell_instances[spell_index][5] = float(int.from_bytes(spell_packet[9:11], "little", signed=True)) / 100
 
 
 def spell_instances_remove(indexes):

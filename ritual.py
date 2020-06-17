@@ -387,8 +387,7 @@ def game():
                 if len(server_data) != 1:
                     print("that's weird we should only get one at a time")
 
-                command = server_data[0]
-                gamestate.state_data_set(command[1:])
+                gamestate.state_data_set(server_data[0])
 
                 input_cache = input_cache[network.client_received_inputs:]
                 network.client_received_inputs = 0
