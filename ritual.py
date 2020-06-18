@@ -430,7 +430,7 @@ def game():
                 pinging = True
                 network.client_write(pinging)
             else:
-                if missed_packets > 9:
+                if pygame.time.get_ticks() - ping_before_time >= 5000:
                     # Assume our packet got lost to the server
                     for input_event in input_cache:
                         network.client_event_queue.append(input_event)

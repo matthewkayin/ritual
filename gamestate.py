@@ -541,7 +541,7 @@ def state_data_get():
         player_packet += int(player_position[player_index][1]).to_bytes(2, "little", signed=True)
         player_packet += int(round(player_velocity[player_index][0], 2) * 100).to_bytes(2, "little", signed=True)
         player_packet += int(round(player_velocity[player_index][1], 2) * 100).to_bytes(2, "little", signed=True)
-        player_packet += int(player_health[player_index]).to_bytes(1, "little", signed=False)
+        player_packet += int(max(player_health[player_index], 0)).to_bytes(1, "little", signed=False)
         player_packet += int(player_hurt_timer[player_index]).to_bytes(1, "little", signed=False)
         player_packet += int(player_selected_spell[player_index]).to_bytes(1, "little", signed=False)
         # For the player spell timer, we send 0 if no pending spell and shift the value of the timer by 1 when there is a spell
