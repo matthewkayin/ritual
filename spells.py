@@ -112,6 +112,9 @@ def instance_update(spell_instance, delta, is_cast=True):
             return
         spell_instance[2] += spell_instance[4] * delta
         spell_instance[3] += spell_instance[5] * delta
+    else:
+        if spell_instance[1] > spell_charge_time[spell_instance[0]]:
+            spell_instance[1] = spell_charge_time[spell_instance[0]]
 
 
 def instance_rect_get(spell_instance):

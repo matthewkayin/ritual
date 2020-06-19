@@ -39,6 +39,7 @@ clock = pygame.time.Clock()
 before_time = 0
 ping_before_time = 0
 ping = 0
+client_reping_count = 0
 UPDATE_TIME = 1000 / 60.0
 TARGET_FPS = 60
 
@@ -436,6 +437,7 @@ def game():
                         network.client_event_queue.append(input_event)
                     missed_packets = 0
                     network.client_write(pinging)
+                    client_reping_count += 1
 
         display_clear()
 
@@ -548,8 +550,10 @@ def display_render_loadscreen(loadscreen_text):
 
 
 def render_fps():
-    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())) + "  Ping: " + str(ping), False, color_yellow)
-    display.blit(text_fps, (0, 0))
+    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())) + "  Ping: " + str(ping), False, color_red)
+    reping_text = font_small.render("Repings: " + str(client_reping_count), False, color_red)
+    display.blit(text_fps, (0, DISPLAY_HEIGHT - 16))
+    display.blit(reping_text, (0, DISPLAY_HEIGHT - 32))
 
 
 if __name__ == "__main__":
