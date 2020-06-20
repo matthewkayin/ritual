@@ -152,14 +152,21 @@ def menu():
                 if menu_textbox_type[menu_state] == 0:
                     continue
                 if menu_textbox_type[menu_state] == 1 and event.key >= pygame.K_a and event.key <= pygame.K_z:
-                    textbox_input += chr(event.key)
+                    if pygame.key.get_pressed()[pygame.K_LSHIFT] or pygame.key.get_pressed()[pygame.K_RSHIFT]:
+                        textbox_input += str(chr(event.key)).upper()
+                    else:
+                        textbox_input += chr(event.key)
+                elif menu_textbox_type[menu_state] == 1 and event.key == pygame.K_MINUS and (pygame.key.get_pressed()[pygame.K_LSHIFT] or pygame.key.get_pressed()[pygame.K_RSHIFT]):
+                    textbox_input += "_"
                 elif menu_textbox_type[menu_state] == 2 and event.key >= pygame.K_0 and event.key <= pygame.K_9:
                     textbox_input += chr(event.key)
-                elif menu_textbox_type[menu_state] == 2 and event.key == pygame.K_PERIOD:
-                    textbox_input += chr(event.key)
+                elif menu_textbox_type[menu_state] == 2 and event.key >= pygame.K_KP0 and event.key <= pygame.K_KP9:
+                    textbox_input += chr(int(event.key) - 208)
+                elif menu_textbox_type[menu_state] == 2 and (event.key == pygame.K_PERIOD or event.key == pygame.K_KP_PERIOD):
+                    textbox_input += "."
                 elif event.key == pygame.K_BACKSPACE:
                     textbox_input = textbox_input[:len(textbox_input) - 1]
-                elif event.key == pygame.K_RETURN:
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
                     if menu_state == 1 and connect_as_server:
                         network.server_username = textbox_input
                         network.server_begin(3535)
@@ -247,7 +254,7 @@ def menu():
 
 
 def game():
-    global connect_as_server, ping
+    global connect_as_server, ping, client_reping_count
 
     running = True
     return_gamestate = GAMESTATE_EXIT
