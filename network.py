@@ -10,6 +10,7 @@ server_game_started = False
 server_listener = None
 server_ip = "127.0.0.1"
 server_username = ""
+server_last_pings_at_once = 0
 server_event_queue = []
 server_client_read_buffer = {}
 server_client_usernames = {}
@@ -106,10 +107,11 @@ def server_read():
 
 
 def server_write(state_data):
-    global server_listener, server_client_read_buffer
+    global server_listener, server_client_read_buffer, server_last_pings_at_once
 
     packet_length = 3 + len(state_data)
 
+    server_last_pings_at_once = sum(server_client_ping.values()))
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
             out_string = int(packet_length).to_bytes(2, "little", signed=False) + int(server_client_inputs_received[address]).to_bytes(1, "little", signed=False) + state_data

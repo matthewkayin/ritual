@@ -557,7 +557,12 @@ def display_render_loadscreen(loadscreen_text):
 
 
 def render_fps():
-    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())) + "  Ping: " + str(ping), False, color_red)
+    ping_value = 0
+    if connect_as_server:
+        ping_value = network.server_last_ping_at_once
+    else:
+        ping_value = ping
+    text_fps = font_small.render("FPS: " + str(round(clock.get_fps())) + "  Ping: " + str(ping_value), False, color_red)
     reping_text = font_small.render("Repings: " + str(client_reping_count), False, color_red)
     display.blit(text_fps, (0, DISPLAY_HEIGHT - 16))
     display.blit(reping_text, (0, DISPLAY_HEIGHT - 32))
