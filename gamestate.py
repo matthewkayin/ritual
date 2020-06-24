@@ -140,7 +140,9 @@ def create_player():
     player_spell_cooldown_timers.append([0, 0, 0, 0])
 
 
-def reset_players():
+def reset_gamestate():
+    global spell_instances
+
     for player_index in range(0, len(player_input_queue)):
         animations.instance_reset(player_animations[player_index][player_animation_state[player_index]])
         player_animation_state[player_index] = 0
@@ -158,9 +160,15 @@ def reset_players():
         player_pending_spells[player_index] = None
         player_spell_cooldown_timers[player_index] = [-1, -1, -1, -1]
 
+    spell_instances = []
+
 
 def player_input_queue_append(player_index, input_event):
     player_input_queue[player_index].append(input_event)
+
+
+def player_input_spellcast_ready(player_index):
+    return player_spell_cooldown_timers[player_index][player_selected_spell[player_index]] == 0
 
 
 def player_input_handle(player_index, input_event):
@@ -340,7 +348,7 @@ def update(delta, update_animations=True):
         for collider in map_colliders:
             stop_colliders.append(collider)
         for other_player_index in range(0, player_count_get()):
-            if other_player_index != player_index:
+            if other_player_index != player_index and player_health[other_player_index] > 0:
                 stop_colliders.append(player_rect_get(other_player_index))
 
         player_rect = player_rect_get(player_index)
@@ -471,7 +479,7 @@ def update(delta, update_animations=True):
                     break
             spell_rect = spells.instance_rect_get(spell_instances[spell_index])
             for player_index in range(0, player_count_get()):
-                if player_teleport_dest[player_index] is not None:
+                if player_teleport_dest[player_index] is not None or player_health[player_index] <= 0:
                     continue
                 player_rect = player_rect_get(player_index)
                 if collision_check_rectangles(spell_rect, player_rect):
@@ -520,7 +528,7 @@ def gameover_timer_update(player_index, delta):
         gameover_reset_timer += delta
         if gameover_reset_timer >= gameover_message_duration:
             gameover_reset_timer = 0
-            reset_players()
+            reset_gamestate()
 
 
 def state_data_get():
@@ -554,6 +562,8 @@ def state_data_get():
         if player_teleport_dest[player_index] is not None:
             player_packet += int(player_teleport_dest[player_index][0]).to_bytes(2, "little", signed=True)
             player_packet += int(player_teleport_dest[player_index][1]).to_bytes(2, "little", signed=True)
+        else:
+            player_packet += int(player_teleport_cooldown_timer[player_index]).to_bytes(2, "little", signed=False)
 
         state_data += player_packet
 
@@ -612,7 +622,11 @@ def state_data_set(state_data):
 
             player_teleport_dest[player_index] = [int.from_bytes(player_teleport_packet[0:2], "little", signed=True), int.from_bytes(player_teleport_packet[2:4], "little", signed=True)]
         else:
+            player_teleport_cooldown_packet = state_data[:2]
+            state_data = state_data[2:]
+
             player_teleport_dest[player_index] = None
+            player_teleport_cooldown_timer[player_index] = int.from_bytes(player_teleport_cooldown_packet, "little", signed=False)
 
     spell_instances = []
 

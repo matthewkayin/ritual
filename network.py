@@ -111,7 +111,7 @@ def server_write(state_data):
 
     packet_length = 3 + len(state_data)
 
-    server_last_pings_at_once = sum(server_client_ping.values()))
+    server_last_pings_at_once = sum(server_client_ping.values())
     for address in server_client_read_buffer.keys():
         if server_client_ping[address]:
             out_string = int(packet_length).to_bytes(2, "little", signed=False) + int(server_client_inputs_received[address]).to_bytes(1, "little", signed=False) + state_data

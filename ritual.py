@@ -359,20 +359,23 @@ def game():
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
                     gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_SPELLCAST, mouse_pos))
                     if not connect_as_server:
-                        network.client_event_queue.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
-                        input_cache.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
+                        if gamestate.player_input_spellcast_ready(local_player_index):
+                            network.client_event_queue.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
+                            input_cache.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
                 elif event.button == 3:
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
                     gamestate.player_input_queue_append(local_player_index, (True, gamestate.INPUT_TELEPORT, mouse_pos))
                     if not connect_as_server:
                         network.client_event_queue.append((True, gamestate.INPUT_TELEPORT, mouse_pos))
+                        input_cache.append((True, gamestate.INPUT_SPELLCAST, mouse_pos))
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     mouse_pos = gamestate.player_input_offset_mouse_position_get(event.pos[0] // SCALE, event.pos[1] // SCALE)
                     gamestate.player_input_queue_append(local_player_index, (False, gamestate.INPUT_SPELLCAST, mouse_pos))
                     if not connect_as_server:
-                        network.client_event_queue.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
-                        input_cache.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
+                        if gamestate.player_input_spellcast_ready(local_player_index):
+                            network.client_event_queue.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
+                            input_cache.append((False, gamestate.INPUT_SPELLCAST, mouse_pos))
             elif event.type == pygame.MOUSEMOTION:
                 gamestate.player_input_mouse_position_set(event.pos[0] // SCALE, event.pos[1] // SCALE)
         gamestate.player_input_queue_pump_events(local_player_index)
@@ -559,7 +562,7 @@ def display_render_loadscreen(loadscreen_text):
 def render_fps():
     ping_value = 0
     if connect_as_server:
-        ping_value = network.server_last_ping_at_once
+        ping_value = network.server_last_pings_at_once
     else:
         ping_value = ping
     text_fps = font_small.render("FPS: " + str(round(clock.get_fps())) + "  Ping: " + str(ping_value), False, color_red)
